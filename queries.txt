@@ -1,0 +1,28 @@
+//1. Query 1 
+MATCH (s:Season) -[c:HAS_GW]-> (gw:Gameweek)
+RETURN count(c); 
+
+//2. Query 2 
+MATCH (p:Player)
+RETURN count(p)
+
+//3. Query 3 
+MATCH (f:Fixture{season: "2021-22"})-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]->(t:Team)
+WITH DISTINCT t
+WHERE NOT EXISTS {
+  MATCH (t)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(:Fixture {season: "2022-23"})
+}
+RETURN t.name AS Relegated_Teams
+
+//4. Query 4 
+MATCH (s:Season {season_name: "2022-23"})-[:HAS_GW]->(gw:Gameweek)-[:HAS_FIXTURE]->(f:Fixture)
+MATCH (p:Player)-[r:PLAYED_IN]->(f)
+WITH p, gw, f, SUM(r.total_points) AS total_gw_points
+ORDER BY total_gw_points DESC
+LIMIT 1
+RETURN p.player_name, total_gw_points
+
+//5. Query 5
+MATCH (p:Player)-[r:PLAYED_IN]->()
+WHERE p.player_name CONTAINS "Elneny" AND r.minutes > 0
+RETURN count(r) AS matches_played 
