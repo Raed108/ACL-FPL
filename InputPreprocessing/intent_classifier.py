@@ -2,7 +2,6 @@
 from google import genai
 from google.genai import types
 import os 
-from dotenv import load_dotenv
 
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -22,7 +21,7 @@ def classify_intent_llm(user_input: str):
     """
 
     chat = client.models.generate_content(
-        model="gemini-2.0-flash", 
+        model="gemini-2.5-flash", 
         contents=prompt,
         # config= types.GenerateContentConfig(system_instruction=prompt)
     )

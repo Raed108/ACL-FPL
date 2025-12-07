@@ -2,18 +2,21 @@ from google import genai
 from google.genai import types
 import os 
 import json
-from dotenv import load_dotenv
 from neo4j import GraphDatabase
 import spacy
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-CONFIG_PATH = os.path.join(BASE_DIR, "..", "config.txt")
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+# CONFIG_PATH = os.path.join(BASE_DIR, "..", "config.txt")
 
-with open(CONFIG_PATH) as f:
-    lines = [line.strip() for line in f if line.strip() and "=" in line]
-    URI = [l for l in lines if l.startswith("URI=")][0].split("=", 1)[1]
-    USERNAME = [l for l in lines if l.startswith("USERNAME=")][0].split("=", 1)[1]
-    PASSWORD = [l for l in lines if l.startswith("PASSWORD=")][0].split("=", 1)[1]
+# with open(CONFIG_PATH) as f:
+#     lines = [line.strip() for line in f if line.strip() and "=" in line]
+#     URI = [l for l in lines if l.startswith("URI=")][0].split("=", 1)[1]
+#     USERNAME = [l for l in lines if l.startswith("USERNAME=")][0].split("=", 1)[1]
+#     PASSWORD = [l for l in lines if l.startswith("PASSWORD=")][0].split("=", 1)[1]
+
+URI = os.getenv("URI")
+USERNAME = os.getenv("NeoName")
+PASSWORD = os.getenv("PASSWORD")
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
 
