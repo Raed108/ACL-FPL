@@ -2,17 +2,10 @@ from google import genai
 from google.genai import types
 import os 
 import json
+from dotenv import load_dotenv
 from neo4j import GraphDatabase
 import spacy
-
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-# CONFIG_PATH = os.path.join(BASE_DIR, "..", "config.txt")
-
-# with open(CONFIG_PATH) as f:
-#     lines = [line.strip() for line in f if line.strip() and "=" in line]
-#     URI = [l for l in lines if l.startswith("URI=")][0].split("=", 1)[1]
-#     USERNAME = [l for l in lines if l.startswith("USERNAME=")][0].split("=", 1)[1]
-#     PASSWORD = [l for l in lines if l.startswith("PASSWORD=")][0].split("=", 1)[1]
+import re
 
 URI = os.getenv("URI")
 USERNAME = os.getenv("NeoName")
@@ -20,28 +13,68 @@ PASSWORD = os.getenv("PASSWORD")
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
 
-# load_dotenv("../.env")
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
+# def extract_entities_with_llm(user_query: str):
+#     prompt = f"""
+#     Extract the following entities from the user query.
+#     If an entity is missing, return null.
+
+#     Entities:
+#     - player_name
+#     - team
+#     - position (map to one of: GK, DEF, MID, FWD)
+#     - gameweek (integer)
+#     - season (year, e.g., 2023-24)
+#     - statistic (map to : goals, assists, saves, minutes, bonus, clean sheets,
+#       goals conceded, own goals, penalties saved, penalties missed,
+#       yellow cards, red cards, total points, bps, form, threat,
+#       creativity, influence)
+
+#     Return output as valid JSON ONLY.
+
+#     User Query: "{user_query}"
+#     """
+
+#     response = client.models.generate_content(
+#         model="gemini-2.5-flash",
+#         contents=prompt
+#     )
+
+#     text = response.candidates[0].content.parts[0].text
+#     # return json.loads(text)
+#     return text
+
 def extract_entities_with_llm(user_query: str):
     prompt = f"""
-    Extract the following entities from the user query.
-    If an entity is missing, return null.
+    Extract *all* possible entities from the user query. 
+    Return EVERY entity as a LIST, even if only one value is found.
 
-    Entities:
-    - player_name
-    - team
-    - position (map to one of: GK, DEF, MID, FWD)
-    - gameweek (integer)
-    - season (year, e.g., 2023-24)
-    - statistic (map to : goals, assists, saves, minutes, bonus, clean sheets,
+    Use this schema:
+
+    {{
+        "player_name": [string],
+        "team": [string],
+        "position": ["GK" | "DEF" | "MID" | "FWD"],
+        "gameweek": [int],
+        "season": [string],
+        "statistic": [string]
+    }}
+
+    Rules:
+    - Always return lists.
+    - If nothing is found for an entity, return an empty list [].
+    - "season" should be full season format like "2022/23" or "2023-24" if mentioned.
+    - "position" must be mapped to one of: GK, DEF, MID, FWD.
+    - "statistic" must be mapped to one of:
+      goals, assists, saves, minutes, bonus, clean sheets,
       goals conceded, own goals, penalties saved, penalties missed,
       yellow cards, red cards, total points, bps, form, threat,
-      creativity, influence)
+      creativity, influence.
 
-    Return output as valid JSON ONLY.
+    Respond with VALID JSON ONLY.
 
     User Query: "{user_query}"
     """
@@ -51,9 +84,13 @@ def extract_entities_with_llm(user_query: str):
         contents=prompt
     )
 
-    text = response.candidates[0].content.parts[0].text
-    # return json.loads(text)
-    return text
+    json_text = response.candidates[0].content.parts[0].text.strip()
+
+    # You may parse JSON here:
+    # return json.loads(json_text)
+
+    return json_text
+
 
 ###########################################
 
@@ -70,7 +107,9 @@ POSITION_MAP = {
 
 with driver.session() as session:
     result = session.run("MATCH (t:Team) WITH DISTINCT t RETURN t.name AS name")
-    teams = {row["name"].lower() for row in result}
+    teams = sorted([row["name"].lower().strip() for row in result], key=len, reverse=True)
+
+
 
     result = session.run("MATCH (s:Season) RETURN s.season_name AS season")
     seasons = {row["season"] for row in result}
@@ -81,50 +120,54 @@ with driver.session() as session:
 def extract_entities_spacy(text):
     doc = nlp(text)
     entities = {
-        "player_name": None,
-        "team": None,
-        "season": None,
-        "gameweek": None,
-        "position": None,
-        "statistic": None
+        "player_name": [],
+        "team": [],
+        "season": [],
+        "gameweek": [],
+        "position": [],
+        "statistic": []
     }
     for ent in doc.ents:
         if ent.label_ == "PERSON":
-            entities["player_name"] = ent.text
+            entities["player_name"].append(ent.text)
         elif ent.label_ == "ORG":
-            entities["team"] = ent.text
+            entities["team"].append(ent.text)
         elif ent.label_ == "DATE":
             if ent.text.isdigit() and len(ent.text) == 4:  
-                entities["season"] = int(ent.text)
+                entities["season"].append(int(ent.text))
         
     return entities
 
-import re
 
 def extract_gameweek(text):
-    # gw5, gw 5, gameweek 5, week 5
-    match = re.search(r"(?:gw|gameweek|week)\s*([0-9]+)", text.lower())
-    return int(match.group(1)) if match else None
+    matches = re.findall(r"(?:gw|gameweek|week)\s*([0-9]+)", text.lower())
+    return [int(m) for m in matches]
+
 
 def extract_position(text):
-    text = text.lower()
+    found = []
     for word, pos in POSITION_MAP.items():
-        if word in text:
-            return pos
-    return None
+        if word in text.lower():
+            if pos not in found:
+                found.append(pos)
+    return found
 
 def extract_team(text):
+    found = []
     for t in teams:
-        if t in text.lower():
-            return t
-    return None
+        if t in text.lower() and t not in found:
+            found.append(t)
+    return found
 
 def extract_season(text):
+    found = []
     for s in seasons:
         if str(s).split("-")[0] in text:
-            return s
+            found.append(s)
+    return found
         
 def extract_statistic(text):
+    found = []
     STATISTIC_MAP = {
         "goals": ["goal", "goals", "scored"],
         "assists": ["assist", "assists"],
@@ -146,12 +189,41 @@ def extract_statistic(text):
         "influence": ["influence"]
     }
 
-    text = text.lower()
     for stat, keywords in STATISTIC_MAP.items():
         for keyword in keywords:
-            if keyword in text:
-                return stat
-    return None
+            if keyword in text.lower():
+                found.append(stat)
+    return found
+
+
+def unique_preserve_order(lst):
+    # 1. Convert all items to strings for comparison
+    str_values = {str(x) for x in lst}
+    
+    seen = set()
+    result = []
+    
+    for item in lst:
+        s_item = str(item)
+        
+        # Check if this item is just a prefix of another item in the list
+        # e.g., if item is 2022, and "2022-23" is also in the list, skip 2022
+        is_redundant = False
+        for other in str_values:
+            if other != s_item and other.startswith(s_item) and len(other) > len(s_item):
+                is_redundant = True
+                break
+        
+        if is_redundant:
+            continue
+
+        # Standard deduplication
+        key = s_item.lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+            
+    return result
 
 
 
@@ -159,12 +231,15 @@ def extract_entities(text):
     entities = extract_entities_spacy(text)
 
     # deterministic logic
-    entities["gameweek"] = entities["gameweek"] or extract_gameweek(text)
-    entities["position"] = entities["position"] or extract_position(text)
-    entities["team"] = entities["team"] or extract_team(text)
-    entities["season"] = entities["season"] or extract_season(text)
-    entities["statistic"] = entities["statistic"] or extract_statistic(text)
+    entities["gameweek"] += extract_gameweek(text)
+    entities["position"] += extract_position(text)
+    entities["team"] += extract_team(text)
+    entities["season"] += extract_season(text)
+    entities["statistic"] += extract_statistic(text)
 
+
+    for key in entities:
+        entities[key] = unique_preserve_order(entities[key])
 
     return entities
 
