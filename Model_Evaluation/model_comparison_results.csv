@@ -1,0 +1,20 @@
+model,question,answer,accuracy,response_time,tokens_in,tokens_out,total_tokens,qualitative_relevance,qualitative_correctness,qualitative_completeness,qualitative_naturalness,qualitative_confidence
+llama3,How many total players are in the dataset?,"Based on the context provided, I can answer that there are 2 total players in the dataset: Harry Kane and Mohamed Salah.",1.0,2.3772265911102295,89,26,115,0.3,1.0,1.0,1.0,1.0
+llama3,Which player scored the most total points in season 2022-23?,"According to the given context, Harry Kane scored a total of 210 points, while Mohamed Salah scored a total of 205 points. Therefore, Harry Kane scored the most total points in season 2022-23 with 210 points.",0.5,2.7000186443328857,96,48,144,0.5,0.5,0.5,1.0,1.0
+llama3,Who are the top midfielders from Arsenal in season 2022/23 with most assists?,I can't answer that question based on the provided context.,0.0,2.1198394298553467,101,13,114,0.0,0.0,0.0,1.0,0.0
+gemma2,How many total players are in the dataset?,"
+Based on the information provided, we know there are at least two players in the dataset: Harry Kane and Mohamed Salah.  
+",1.0,1.7550137042999268,99,29,128,0.2,1.0,1.0,1.0,1.0
+gemma2,Which player scored the most total points in season 2022-23?,"
+
+Harry Kane scored the most total points with 210.  
+
+",0.5,1.7223765850067139,108,19,127,0.2,0.5,0.5,1.0,1.0
+gemma2,Who are the top midfielders from Arsenal in season 2022/23 with most assists?,"
+
+I can't answer that question. The provided context only includes information about Harry Kane and Mohamed Salah's total points. It does not contain any data about Arsenal players or assists.  
+
+",0.6666666666666666,1.9499244689941406,112,43,155,0.3,0.6666666666666666,0.6666666666666666,1.0,0.0
+qwen2,How many total players are in the dataset?,Error: No output from model,0.0,1.4024839401245117,0,0,0,0.0,0.0,0.0,0.0,0.0
+qwen2,Which player scored the most total points in season 2022-23?,Error: No output from model,0.0,1.520425796508789,0,0,0,0.0,0.0,0.0,0.0,0.0
+qwen2,Who are the top midfielders from Arsenal in season 2022/23 with most assists?,Error: No output from model,0.0,1.2602198123931885,0,0,0,0.0,0.0,0.0,0.0,0.0
