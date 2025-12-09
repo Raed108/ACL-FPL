@@ -39,7 +39,7 @@ def classify_intent(user_input: str) -> str:
     text = user_input.lower().strip()
 
     # 1. Recommendation / Best / Top / Suggest
-    if any(word in text for word in ["recommend", "suggest", "best", "top", "captain", "vice-captain",
+    if any(word in text for word in ["recommend", "suggest", "best",  "captain", "vice-captain",
                                      "who should i pick", "who to buy", "who to transfer", "budget",
                                      "who should i pick", "who to buy", "who to transfer", "captain", "vice-captain"]):
         return "recommendation"
