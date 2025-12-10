@@ -13,8 +13,8 @@ class GraphRetrieval:
     def __init__(self):
         self.driver = driver
 
-    def close(self):
-        self.driver.close()
+    # def close(self):
+    #     self.driver.close()
 
     #--------------------------------------------
     # Helper: run query and return results
@@ -40,11 +40,11 @@ class GraphRetrieval:
         """
         queries = []
 
-        # -------------------------------------
-        # Player Stats Queries
+       # -------------------------------------
+        # Intent: Player Stats
         # -------------------------------------
         if intent == "player_stats":
-            # 1. Detailed Season Overview (aggregated stats)
+            # 1. Detailed Season Overview
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
@@ -56,11 +56,10 @@ class GraphRetrieval:
                        sum(r.goals_scored) AS goals, 
                        sum(r.assists) AS assists, 
                        sum(r.clean_sheets) AS clean_sheets,
-                       sum(r.total_points) AS total_points,
-                       sum(r.bonus) AS total_bonus
+                       sum(r.total_points) AS total_points
             """)
 
-            # 2. "Recent Form" - Last 5 Gameweeks specific breakdown
+            # 2. Recent Form (Last 5 Games Played)
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
@@ -73,7 +72,7 @@ class GraphRetrieval:
                        avg(r.ict_index) as avg_ict_form
             """)
 
-            # 3. Efficiency Stats (Points per 90 mins)
+            # 3. Efficiency (Points per 90)
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
@@ -84,12 +83,13 @@ class GraphRetrieval:
             """)
 
         # -------------------------------------
-        # Top Players Queries
+        # Intent: Top Players
         # -------------------------------------
         elif intent == "top_players":
-            # 1. The "King" List - Top Total Points
+            # 1. Top Point Scorers
             queries.append("""
-                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)-[:PLAYS_AS]->(pos:Position)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
+                MATCH (p)-[:PLAYS_AS]->(pos:Position)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
                 WHERE ($position IS NULL OR toLower(pos.name) CONTAINS toLower($position))
                   AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
@@ -98,29 +98,30 @@ class GraphRetrieval:
                 LIMIT 10
             """)
 
-            # 2. Top Goal Scorers (Golden Boot race)
+            # 2. Golden Boot (Goals)
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
                 WHERE ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
-                RETURN p.player_name AS player, sum(r.goals_scored) AS goals, sum(r.minutes) as minutes
+                RETURN p.player_name AS player, sum(r.goals_scored) AS goals
                 ORDER BY goals DESC
                 LIMIT 5
             """)
 
-            # 3. Top Playmakers (Assists + Creativity)
+            # 3. Top Playmakers (Assists)
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
                 WHERE ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
-                RETURN p.player_name AS player, sum(r.assists) AS assists, sum(r.ict_index) as total_ict
+                RETURN p.player_name AS player, sum(r.assists) AS assists, sum(r.ict_index) as creativity_score
                 ORDER BY assists DESC
                 LIMIT 5
             """)
 
-            # 4. Top Defenders (Clean Sheets & Goals Conceded)
+            # 4. Top Defenders
             queries.append("""
-                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)-[:PLAYS_AS]->(pos:Position)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
+                MATCH (p)-[:PLAYS_AS]->(pos:Position)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
                 WHERE pos.name IN ['DEF', 'GK']
                   AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
@@ -133,65 +134,78 @@ class GraphRetrieval:
             """)
 
         # -------------------------------------
-        # Fixture Queries
+        # Intent: Fixture Query
         # -------------------------------------
         elif intent == "fixture_query":
-            # 1. Upcoming Schedule (Next 3 Matches)
+            # FIXED: Removed [:PLAYS_FOR]. Now relies on 'Team' entity to find fixtures.
+            # If user asks "Salah fixtures", this works best if 'Liverpool' is also extracted 
+            # or if the LLM infers the team.
             queries.append("""
-                MATCH (p:Player)-[:PLAYS_FOR]->(my_team:Team)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
-                WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
-                  AND ($team IS NULL OR toLower(my_team.name) CONTAINS toLower($team))
+                MATCH (t:Team)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+                WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
                   AND f.kickoff_time >= datetime() 
-                WITH f, my_team
+                WITH f, t
                 MATCH (f)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(opponent:Team)
-                WHERE opponent <> my_team
+                WHERE opponent <> t
                 RETURN f.kickoff_time AS kickoff, 
-                       my_team.name AS team, 
+                       t.name AS team, 
                        opponent.name AS opponent
                 ORDER BY f.kickoff_time ASC
                 LIMIT 3
             """)
 
         # -------------------------------------
-        # Team Analysis Queries
+        # Intent: Team Analysis
         # -------------------------------------
         elif intent == "team_analysis":
-            # 1. Best Attackers in the Team
+            # FIXED: Removed [:PLAYS_FOR]. 
+            # Finds players who played in matches involving the specific team.
+            
+            # 1. Best Attackers (Goals/Assists in games involving this team)
             queries.append("""
-                MATCH (t:Team)<-[:PLAYS_FOR]-(p:Player)-[r:PLAYED_IN]->(f:Fixture)
-                WHERE ($team IS NULL OR toLower(t.name) CONTAINS toLower($team))
-                RETURN p.player_name AS player, sum(r.goals_scored) AS goals, sum(r.assists) AS assists, sum(r.total_points) as points
+                MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f)
+                WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                RETURN p.player_name AS player, 
+                       sum(r.goals_scored) AS goals, 
+                       sum(r.assists) AS assists, 
+                       sum(r.total_points) as points
                 ORDER BY points DESC
                 LIMIT 5
             """)
 
-            # 2. Team Defensive Record (aggregated via GK stats)
+            # 2. Team Defensive Overview (via Clean Sheets in team games)
             queries.append("""
-                MATCH (t:Team)<-[:PLAYS_FOR]-(p:Player)-[r:PLAYED_IN]->(f:Fixture)
+                MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f)
                 MATCH (p)-[:PLAYS_AS]->(pos:Position)
-                WHERE ($team IS NULL OR toLower(t.name) CONTAINS toLower($team))
-                  AND pos.name = 'GK'
+                WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                  AND pos.name = 'GK' 
                 RETURN t.name AS team, 
                        sum(r.clean_sheets) AS total_clean_sheets, 
                        sum(r.goals_conceded) AS total_goals_conceded
             """)
 
         # -------------------------------------
-        # Recommendation Queries
+        # Intent: Recommendation
         # -------------------------------------
         elif intent == "recommendation":
-            # 1. Best Value Picks (High Points, Low Cost/Selection)
+            # 1. Value Picks (Points per 90min)
             queries.append("""
-                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)-[:PLAYS_AS]->(pos:Position)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
+                MATCH (p)-[:PLAYS_AS]->(pos:Position)
                 WHERE ($position IS NULL OR toLower(pos.name) CONTAINS toLower($position))
                 WITH p, pos, sum(r.total_points) as pts, sum(r.minutes) as mins
                 WHERE mins > 500
-                RETURN p.player_name AS player, pos.name AS position, pts AS total_points, (toFloat(pts)/mins * 90) as pts_per_90
+                RETURN p.player_name AS player, 
+                       pos.name AS position, 
+                       pts AS total_points, 
+                       (toFloat(pts)/mins * 90) as pts_per_90
                 ORDER BY pts_per_90 DESC
                 LIMIT 5
             """)
 
-            # 2. Captaincy Options (Highest Form over last 3 games)
+            # 2. Form (Last 3 Games)
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)
