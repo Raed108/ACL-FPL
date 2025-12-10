@@ -1,0 +1,95 @@
+model,question,answer,accuracy,response_time,tokens_in,tokens_out,total_tokens,qualitative_relevance,qualitative_correctness,qualitative_completeness,qualitative_naturalness,qualitative_confidence
+llama3,How many total players are in the Premier League 2022-23 season?,"I don't see any information about the total number of players in the Premier League 2022-23 season. However, I can tell you that among these three players, Harry Kane is in a good position in the current season with 210 total points, but Mohamed Salah is slightly behind with 205, and Kevin De Bruyne is a key contributor with 12 assists so far, making him an attractive differential pick.",0.7142857142857143,3.0588033199310303,98,86,184,,,,,
+llama3,Which player scored the most total points in 2022-23?,"Based on the information provided, it's clear that Harry Kane currently leads Mohamed Salah by 5 points.",0.14285714285714285,1.9182384014129639,96,22,118,,,,,
+llama3,Who are the top midfielders from Arsenal in 2022-23 with most assists?,"Sorry, I can't answer that.",0.0,1.7917182445526123,100,9,109,,,,,
+llama3,Which goalkeeper had the most clean sheets in 2022-23?,"I'm afraid we don't have any information about goalkeepers and their clean sheets in 2022-23 season. The data provided only covers Harry Kane's and Mohamed Salah's total points and Kevin De Bruyne's assists. If you have any other question related to these three players, I'd be happy to help!",0.5,3.7183988094329834,95,65,160,,,,,
+llama3,Which team won the Premier League in 2022-23?,"Sorry mate, that's not relevant to FPL, which is about fantasy football. The information you provided doesn't mention the Premier League winner.",0.6,1.843979835510254,94,29,123,,,,,
+llama3,Who scored the fastest goal in 2022-23 season?,"Unfortunately, the information provided doesn't include any details about goals scored, but it gives an overview of the respective points totals of the three players (Harry Kane and Mohamed Salah were tied for 5th in your league, and Arsenal's top midfielder, Kevin De Bruyne, has 12 assists).",0.4,2.1243906021118164,95,61,156,,,,,
+llama3,Which player received the most yellow cards in 2022-23?,"Unfortunately, I don't have information on which player received the most yellow cards in the 2022-23 season with the provided details. However, I do have some general insights.
+
+Given that I have information on Mohamed Salah's total points (205) and Harry Kane's total points (210), but no information on the player who received the most yellow cards in 2022-23. I suggest you check the official Premier League stats for more information on yellow card leaders for the season.",0.8571428571428571,3.556588888168335,96,100,196,,,,,
+llama3,Who are the top 3 scorers in 2022-23 season?,"Based on the given data, I can provide a partial answer. Since we only have information about a few players, I can tell you the top two highest-scoring players:
+
+1. Harry Kane (210 points)
+2. Mohamed Salah (205 points)
+
+Unfortunately, the total points table is not provided, so I do not have enough data to determine the third highest scorer of the 2022-23 season. I can, however, confirm that Harry Kane is the top scorer at this moment.",0.3333333333333333,3.5901639461517334,98,101,199,,,,,
+llama3,Which team had the best defensive record in 2022-23?,"Unfortunately, I don't have access to information about the 2022-23 team's defensive records. I can provide you with FPL-related information, but team defensive records aren't within my information.",0.5,2.960186243057251,96,42,138,,,,,
+llama3,Which player had the highest average rating in 2022-23?,"According to the stats, I can provide some context. However, average rating information isn't provided. As an FPL expert assistant, I can tell you about their performance based on available data, though.
+
+Harry Kane and Mohamed Salah both received an average of at least 8.5 points per match, given their total points are 210 and 205 respectively.",0.3333333333333333,2.5230371952056885,96,74,170,,,,,
+gemma2,How many total players are in the Premier League 2022-23 season?,"
+
+I cannot answer that question.  The provided information only includes points for Harry Kane, Mohamed Salah, and assists for Kevin De Bruyne.  There's no information about the total number of players in the Premier League. 
+
+",0.5714285714285714,1.761436939239502,110,51,161,,,,,
+gemma2,Which player scored the most total points in 2022-23?,"
+
+Harry Kane scored the most total points with 210.  
+",0.5714285714285714,2.9735934734344482,108,18,126,,,,,
+gemma2,Who are the top midfielders from Arsenal in 2022-23 with most assists?,"
+
+Kevin De Bruyne had 12 assists  
+",0.0,1.0473747253417969,112,14,126,,,,,
+gemma2,Which goalkeeper had the most clean sheets in 2022-23?,"
+
+I cannot answer that question. The provided information only details the total points of Harry Kane and Mohamed Salah and the assists of Kevin De Bruyne. There is no information about goalkeepers or clean sheets. 
+
+
+",0.5,1.515385389328003,108,45,153,,,,,
+gemma2,Which team won the Premier League in 2022-23?,"
+
+I believe I can help, but I can't answer which team won the Premier League. The information provided only shows player stats for Harry Kane, Mohamed Salah, and Kevin De Bruyne. It doesn't include team information. 
+
+
+",0.8,2.2233004570007324,107,52,159,,,,,
+gemma2,Who scored the fastest goal in 2022-23 season?,"
+I can't answer that question. The provided information only shows the total points for Harry Kane, Mohamed Salah, and Kevin De Bruyne's assists.  It doesn't mention anything about goal-scoring speed.  
+
+",0.2,1.513044834136963,107,51,158,,,,,
+gemma2,Which player received the most yellow cards in 2022-23?,"
+
+I cannot answer that question. The provided information only lists total points and assists, not yellow cards.  
+",0.2857142857142857,1.0135939121246338,108,25,133,,,,,
+gemma2,Who are the top 3 scorers in 2022-23 season?,"
+
+Based on the information provided, the top 3 scorers in the 2022-23 season are:
+
+1. Harry Kane (210 points)
+2. Mohamed Salah (205 points) 
+3.  Kevin De Bruyne (Assists: 12) 
+
+
+**Please note:** We can only determine the top two scorers definitively. While De Bruyne's assists are impressive, the provided data doesn't specify his total points.  
+
+",0.6666666666666666,1.7762467861175537,109,106,215,,,,,
+gemma2,Which team had the best defensive record in 2022-23?,"
+
+I can't answer that question. The provided information only shows the total fantasy points for Harry Kane and Mohamed Salah, and assists for Kevin De Bruyne. There's no information about defensive records of any team. 
+",0.5,1.5216116905212402,108,49,157,,,,,
+gemma2,Which player had the highest average rating in 2022-23?,"
+
+You haven't provided enough information to determine which player had the highest average rating in 2022-23.  
+
+I can only tell you the total points scored by Harry Kane (210) and Mohamed Salah (205), and that Kevin De Bruyne had 12 assists.  Average rating would require more detailed stats. 
+
+",0.8333333333333334,1.4378821849822998,108,80,188,,,,,
+mistralai,How many total players are in the Premier League 2022-23 season?, ,0.0,1.3290143013000488,109,3,112,,,,,
+mistralai,Which player scored the most total points in 2022-23?, Harry Kane scored the most total points in the 2022-23 season with 210 points.,0.5714285714285714,5.094132661819458,107,26,133,,,,,
+mistralai,Who are the top midfielders from Arsenal in 2022-23 with most assists?," Based on the provided context, the top midfielder from Arsenal in the 2022-23 season with the most assists is Kevin De Bruyne, who has 12 assists.",0.7142857142857143,1.9603166580200195,112,41,153,,,,,
+mistralai,Which goalkeeper had the most clean sheets in 2022-23?," The information provided does not include any data about goalkeepers or their clean sheets in the 2022-23 season. Therefore, I cannot answer the question based on the given context.",0.5,1.8317363262176514,107,42,149,,,,,
+mistralai,Which team won the Premier League in 2022-23?, ,0.0,1.1798725128173828,106,3,109,,,,,
+mistralai,Who scored the fastest goal in 2022-23 season?," 
+
+Based on the provided information, I cannot determine who scored the fastest goal in the 2022-23 season. The data only includes total points for Harry Kane and Mohamed Salah, as well as assists for Kevin De Bruyne. There is no information about goal timings or fastest goals.",0.8,3.8897557258605957,106,64,170,,,,,
+mistralai,Which player received the most yellow cards in 2022-23?," 
+
+The information provided does not include any data about yellow cards received by the players. Therefore, I cannot determine which player received the most yellow cards in the 2022-23 season based on the given context.",0.8571428571428571,2.7690963745117188,107,48,155,,,,,
+mistralai,Who are the top 3 scorers in 2022-23 season?," 
+
+Based on the provided information, the top 3 scorers in the 2022-23 season are:
+1. Harry Kane with 210 total points.
+2. Mohamed Salah with 205 total points.
+3. Kevin De Bruyne with 12 assists (though his total points are not specified, he is mentioned as the top midfielder for Arsenal, implying high performance).",0.6666666666666666,5.16703200340271,109,87,196,,,,,
+mistralai,Which team had the best defensive record in 2022-23?," The information provided does not include any details about defensive records for any teams in the 2022-23 season. Therefore, I cannot answer the question based on the given context.",0.5,2.1460750102996826,107,40,147,,,,,
+mistralai,Which player had the highest average rating in 2022-23?,"Error: unexpected response format {'error': {'message': 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', 'code': 429, 'metadata': {'headers': {'X-RateLimit-Limit': '50', 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': '1765324800000'}, 'provider_name': None}}, 'user_id': 'user_36brpYa0gHoUHuQm7Pggf91m6GP'}",0.0,0.8142685890197754,0,0,0,,,,,
