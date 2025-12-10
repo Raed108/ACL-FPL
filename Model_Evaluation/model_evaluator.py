@@ -2,47 +2,16 @@ import time
 import requests
 import pandas as pd
 
-# ------------------------
-# 1) Define LLMs to test
-# ------------------------
 MODELS = {
     "llama3": "meta-llama/llama-3-8b-instruct",
     "gemma2": "google/gemma-2-9b-it",
-    "qwen2": "qwen/qwen2-7b-instruct"
+    "mistralai": "mistralai/mistral-7b-instruct:free"
 }
 
-# Example test queries
-TEST_QUERIES = [
-    {"question": "How many total players are in the dataset?", "expected_keywords": ["players"]},
-    {"question": "Which player scored the most total points in season 2022-23?", "expected_keywords": ["player", "points"]},
-    {"question": "Who are the top midfielders from Arsenal in season 2022/23 with most assists?", "expected_keywords": ["midfielders", "Arsenal", "assists"]}
-]
-
-# ------------------------
-# 2) Query LLM
-# ------------------------
-def query_llm(model_name, kg_context, user_question, api_key):
-    """
-    Sends structured prompt to LLM and returns answer + metrics.
-    """
-    url = "https://openrouter.ai/api/v1/chat/completions"  # example
+def query_llm(model_name, prompt_str, api_key):
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    
-    prompt = f"""
-Context (from KG):
-{kg_context}
-
-Persona:
-You are an FPL expert assistant that answers fantasy football questions using only the KG context.
-
-Task:
-Answer the following user question using only the information above. Do not hallucinate.
-
-User Question:
-"{user_question}"
-    """
-    
-    body = {"model": model_name, "messages":[{"role":"user","content":prompt}]}
+    body = {"model": model_name, "messages":[{"role":"user","content":prompt_str}]}
 
     start_time = time.time()
     response = requests.post(url, headers=headers, json=body)
@@ -50,13 +19,22 @@ User Question:
 
     try:
         data = response.json()
-        answer = data["choices"][0]["message"]["content"]
-        usage = data.get("usage", {})
+        if "choices" in data:
+            answer = data["choices"][0]["message"]["content"]
+            usage = data.get("usage", {})
+        elif "result" in data:  # fallback for Qwen-style output
+            answer = data["result"]
+            usage = {}
+        else:
+            answer = f"Error: unexpected response format {data}"
+            usage = {}
+
         tokens_in = usage.get("prompt_tokens", 0)
         tokens_out = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
-    except:
-        answer = "Error: No output from model"
+
+    except Exception as e:
+        answer = f"Error: {str(e)}"
         tokens_in = tokens_out = total_tokens = 0
 
     return {
@@ -67,80 +45,87 @@ User Question:
         "total_tokens": total_tokens
     }
 
-# ------------------------
-# 3) Accuracy metric
-# ------------------------
+
 def compute_accuracy(answer, expected_keywords):
-    if not expected_keywords: return None
+    if not expected_keywords: 
+        return None
     correct = sum(1 for k in expected_keywords if k.lower() in answer.lower())
     return correct / len(expected_keywords)
 
-# ------------------------
-# 4) Qualitative metrics heuristics
-# ------------------------
-def compute_qualitative_metrics(answer, expected_keywords, kg_context):
-    # Relevance: fraction of KG keywords found in answer
-    kg_keywords = set(word.lower() for word in kg_context.split())
-    answer_words = set(word.lower() for word in answer.split())
-    qualitative_relevance = len(kg_keywords & answer_words) / max(1, len(kg_keywords))
 
-    # Correctness: same as accuracy
-    qualitative_correctness = compute_accuracy(answer, expected_keywords)
+class ModelEvaluator:
+    def __init__(self, prompt_template, api_key, test_queries_file="test_queries.txt"):
+        self.prompt_template = prompt_template
+        self.api_key = api_key
+        self.test_queries_file = test_queries_file
+        self.test_queries = self._load_test_queries()
 
-    # Completeness: 1 if all expected keywords present, else fraction
-    qualitative_completeness = sum(1 for k in expected_keywords if k.lower() in answer.lower()) / max(1, len(expected_keywords))
+    def _load_test_queries(self):
+        with open(self.test_queries_file, "r") as f:
+            return [line.strip() for line in f if line.strip()]
 
-    # Naturalness: 1 if non-empty answer, 0 otherwise
-    qualitative_naturalness = 1.0 if answer.strip() and "Error" not in answer else 0.0
+    def evaluate(self):
+        results = []
 
-    # Confidence: 0 if "I can't" or "Error" in answer, else 1
-    qualitative_confidence = 0.0 if "I can't" in answer or "Error" in answer else 1.0
+        for model_name, model_id in MODELS.items():
+            print(f"\nEvaluating model: {model_name}")
+            for q in self.test_queries:
+                expected_keywords = [w for w in q.lower().split() if len(w) > 3]
 
-    return qualitative_relevance, qualitative_correctness, qualitative_completeness, qualitative_naturalness, qualitative_confidence
+                prompt_str = self.prompt_template.format(question=q)
+                output = query_llm(model_id, prompt_str, self.api_key)
 
-# ------------------------
-# 5) Run evaluation across models
-# ------------------------
-def evaluate_models(kg_context, api_key):
-    results = []
+                accuracy = compute_accuracy(output["answer"], expected_keywords)
 
-    for model_name, model_id in MODELS.items():
-        print(f"\nEvaluating model: {model_name}")
-        for test in TEST_QUERIES:
-            q = test["question"]
-            expected = test["expected_keywords"]
+                # qualitative fields left EMPTY for human input
+                results.append({
+                    "model": model_name,
+                    "question": q,
+                    "answer": output["answer"],
+                    "accuracy": accuracy,
+                    "response_time": output["response_time"],
+                    "tokens_in": output["tokens_in"],
+                    "tokens_out": output["tokens_out"],
+                    "total_tokens": output["total_tokens"],
+                    "qualitative_relevance": "",
+                    "qualitative_correctness": "",
+                    "qualitative_completeness": "",
+                    "qualitative_naturalness": "",
+                    "qualitative_confidence": ""
+                })
 
-            output = query_llm(model_id, kg_context, q, api_key)
+        df = pd.DataFrame(results)
+        df.to_csv("model_comparison_results.csv", index=False)
+        print("\nSaved results → model_comparison_results.csv")
 
-            # Compute metrics
-            accuracy = compute_accuracy(output["answer"], expected)
-            relevance, correctness, completeness, naturalness, confidence = compute_qualitative_metrics(output["answer"], expected, kg_context)
+        # Best model = only quantitative (accuracy)
+        summary = df.groupby("model")[["accuracy"]].mean()
+        best_model = summary["accuracy"].idxmax()
 
-            results.append({
-                "model": model_name,
-                "question": q,
-                "answer": output["answer"],
-                "accuracy": accuracy,
-                "response_time": output["response_time"],
-                "tokens_in": output["tokens_in"],
-                "tokens_out": output["tokens_out"],
-                "total_tokens": output["total_tokens"],
-                "qualitative_relevance": relevance,
-                "qualitative_correctness": correctness,
-                "qualitative_completeness": completeness,
-                "qualitative_naturalness": naturalness,
-                "qualitative_confidence": confidence
-            })
+        print("\nBest model:", best_model)
+        print(summary)
+        return df, best_model
 
-    df = pd.DataFrame(results)
-    df.to_csv("model_comparison_results.csv", index=False)
-    print("\nSaved results → model_comparison_results.csv")
 
-# ------------------------
-# 6) Example usage
-# ------------------------
+# ==================== Example usage ====================
 if __name__ == "__main__":
-    # Example KG context string (replace with your actual KG query result)
-    example_kg_context = "- Player: Harry Kane, Total Points: 210\n- Player: Mohamed Salah, Total Points: 205\n"
+    prompt_template = """
+Context:
+- Player: Harry Kane, Total Points: 210
+- Player: Mohamed Salah, Total Points: 205
+- Player: Arsenal Top Midfielder: Kevin De Bruyne, Assists: 12
+
+Persona:
+You are an FPL expert assistant.
+
+Task:
+Answer the user's question using only the information above.
+
+Question:
+{question}
+"""
+
     OPENROUTER_API_KEY = "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"
-    evaluate_models(example_kg_context, OPENROUTER_API_KEY)
+
+    evaluator = ModelEvaluator(prompt_template, OPENROUTER_API_KEY)
+    df_results, best_model = evaluator.evaluate()
