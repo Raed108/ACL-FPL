@@ -419,20 +419,18 @@ def cypher_recommend(season: str = None, position: str = None):
 
 
 # Update the answer_query function to use the new multi-query structure
-def answer_query(user_input: str, model_choice="mpnet"):
+def answer_query(user_input: str, entities, intent, model_choice="mpnet"):
     # 1. Classify intent
-    intent = classify_intent(user_input)
+    # intent = classify_intent(user_input)
     # intent = classify_intent_llm(user_input)
     
     # 2. Extract entities
-    entities = extract_entities(user_input)
+    # entities = extract_entities(user_input)
     # entities = extract_entities_with_llm(user_input)
 
     season = entities.get("season", [None])[0] if entities.get("season") else None
-    
-    # 3. Embed user query
-    qvec = embed_user_query(user_input, model_choice)
-    
+
+
     # 4. Retrieve top similar nodes
     candidates = semantic_search(user_input, model_choice=model_choice, limit=5)
     
