@@ -17,62 +17,40 @@ driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
-# def extract_entities_with_llm(user_query: str):
-#     prompt = f"""
-#     Extract the following entities from the user query.
-#     If an entity is missing, return null.
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-#     Entities:
-#     - player_name
-#     - team
-#     - position (map to one of: GK, DEF, MID, FWD)
-#     - gameweek (integer)
-#     - season (year, e.g., 2023-24)
-#     - statistic (map to : goals, assists, saves, minutes, bonus, clean sheets,
-#       goals conceded, own goals, penalties saved, penalties missed,
-#       yellow cards, red cards, total points, bps, form, threat,
-#       creativity, influence)
 
-#     Return output as valid JSON ONLY.
+class Entity(BaseModel):
+    player_name: List[str] = Field(
+        default_factory=list,
+        description="List of player names mentioned in the query. May be empty if no player names are detected."
+    )
+    team: List[str] = Field(
+        default_factory=list,
+        description="List of team names detected in the query. May be empty if no teams are detected."
+    )
+    season: List[str] = Field(
+        default_factory=list,
+        description="List of football seasons referenced in the query and should be full season format like \"2022-23\" e.g if user enters(2022 or 22), and we have only 2 seasons 2021-22 and 2022-23, if else return embt list"
+    )
+    gameweek: List[str] = Field(
+        default_factory=list,
+        description="List of gameweeks mentioned in the query (e.g., 'GW12'). May be empty."
+    )
+    position: List[str] = Field(
+        default_factory=list,
+        description="List of football player positions extracted from the query (e.g., 'DEF','MID'). May be empty."
+    )
+    statistic: List[str] = Field(
+        default_factory=list,
+        description="List of statistical attributes referenced in the query (e.g., 'goals', 'assists'). May be empty."
+    )
 
-#     User Query: "{user_query}"
-#     """
 
-#     response = client.models.generate_content(
-#         model="gemini-2.5-flash",
-#         contents=prompt
-#     )
-
-#     text = response.candidates[0].content.parts[0].text
-#     # return json.loads(text)
-#     return text
 
 def extract_entities_with_llm(user_query: str):
     prompt = f"""
-    Extract *all* possible entities from the user query. 
-    Return EVERY entity as a LIST, even if only one value is found.
-
-    Use this schema:
-
-    {{
-        "player_name": [string],
-        "team": [string],
-        "position": ["GK" | "DEF" | "MID" | "FWD"],
-        "gameweek": [int],
-        "season": [string],
-        "statistic": [string]
-    }}
-
-    Rules:
-    - Always return lists.
-    - If nothing is found for an entity, return an empty list [].
-    - "season" should be full season format like "2022/23" or "2023-24" if mentioned.
-    - "position" must be mapped to one of: GK, DEF, MID, FWD.
-    - "statistic" must be mapped to one of:
-      goals, assists, saves, minutes, bonus, clean sheets,
-      goals conceded, own goals, penalties saved, penalties missed,
-      yellow cards, red cards, total points, bps, form, threat,
-      creativity, influence.
 
     Respond with VALID JSON ONLY.
 
@@ -84,11 +62,8 @@ def extract_entities_with_llm(user_query: str):
         contents=prompt
     )
 
-    json_text = response.candidates[0].content.parts[0].text.strip()
 
-    # You may parse JSON here:
-    # return json.loads(json_text)
-
+    json_text = json.loads(response.text)
     return json_text
 
 

@@ -689,7 +689,7 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
                 baseline_results = {}
                 vector_results = []
 
-                if retrieval_method in ["Baseline Only", "Baseline + Embedding"]:
+                if retrieval_method == "Baseline Only":
                     graph_retriever = GraphRetrieval()
                     baseline_results = graph_retriever.retrieve_kg_context(entities, intent)
 
@@ -698,10 +698,9 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
 
                 # Combine Results
                 if retrieval_method == "Baseline + Embedding":
-                    flattened_baseline = format_context_for_display(baseline_results)
-                    combined_context = combine_retrieval_results(flattened_baseline, vector_results)
+                    combined_context = combine_retrieval_results(baseline_results, vector_results)
                 elif retrieval_method == "Baseline Only":
-                    combined_context = format_context_for_display(baseline_results)
+                    combined_context = format_context_for_display(baseline_results,[])
                 else:
                     combined_context = vector_results
 

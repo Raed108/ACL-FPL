@@ -23,7 +23,6 @@ def classify_intent_llm(user_input: str):
     chat = client.models.generate_content(
         model="gemini-2.5-flash", 
         contents=prompt,
-        # config= types.GenerateContentConfig(system_instruction=prompt)
     )
 
     intent = chat.candidates[0].content.parts[0].text

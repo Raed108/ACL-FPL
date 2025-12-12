@@ -1,15 +1,19 @@
 from sentence_transformers import SentenceTransformer
 
-# Load same model you used for node embeddings
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+# Two embedding models (Requirement 1)
+MODEL_MINILM = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL_MPNET = "sentence-transformers/all-mpnet-base-v2"
 
-def embed_user_query(text: str):
-    vector = model.encode(text).tolist()  # convert to Python list (Neo4j compatible)
+models = {
+    "minilm": SentenceTransformer(MODEL_MINILM),
+    "mpnet": SentenceTransformer(MODEL_MPNET)
+}
+
+
+def embed_user_query(text: str, model_choice: str = "minilm"):
+    """
+    Convert user text query into an embedding using the SELECTED model.
+    """
+    model = models[model_choice]
+    vector = model.encode(text).tolist()
     return vector
-
-# # Example user query
-# user_query = "Who are the top forwards in the 2023 season?"
-# embedding = embed_user_query(user_query)
-
-# print("User query embedding (vector length = {}):".format(len(embedding)))
-# print(embedding[:10], "...")   # print first 10 dims
