@@ -1,10 +1,16 @@
 import time
+import os
 import requests
 import pandas as pd
+from dotenv import load_dotenv
+
+
+load_dotenv()
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 MODELS = {
-    "llama3": "meta-llama/llama-3-8b-instruct",
-    "gemma2": "google/gemma-2-9b-it",
+    "llama3.3": "meta-llama/llama-3.3-70b-instruct:free",
+    "gemma3": "google/gemma-3-12b-it:free",
     "mistralai": "mistralai/mistral-7b-instruct:free"
 }
 
@@ -42,7 +48,8 @@ def query_llm(model_name, prompt_str, api_key):
         "response_time": latency,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
-        "total_tokens": total_tokens
+        "total_tokens": total_tokens,
+        "model" : model_name
     }
 
 
@@ -108,24 +115,27 @@ class ModelEvaluator:
 
 
 # ==================== Example usage ====================
-if __name__ == "__main__":
-    prompt_template = """
-Context:
-- Player: Harry Kane, Total Points: 210
-- Player: Mohamed Salah, Total Points: 205
-- Player: Arsenal Top Midfielder: Kevin De Bruyne, Assists: 12
+# if __name__ == "__main__":
+#     prompt_template = """
+# Context:
+# - Player: Harry Kane, Total Points: 210
+# - Player: Mohamed Salah, Total Points: 205
+# - Player: Arsenal Top Midfielder: Kevin De Bruyne, Assists: 12
 
-Persona:
-You are an FPL expert assistant.
+# Persona:
+# You are an FPL expert assistant.
 
-Task:
-Answer the user's question using only the information above.
+# Task:
+# Answer the user's question using only the information above.
 
-Question:
-{question}
-"""
+# Question:
+# {question}
+# """
 
-    OPENROUTER_API_KEY = "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"
 
-    evaluator = ModelEvaluator(prompt_template, OPENROUTER_API_KEY)
-    df_results, best_model = evaluator.evaluate()
+#     evaluator = ModelEvaluator(prompt_template, OPENROUTER_API_KEY)
+#     df_results, best_model = evaluator.evaluate()
+
+# print(query_llm("meta-llama/llama-3.3-70b-instruct:free", "what is today's date?", OPENROUTER_API_KEY))
+# print(query_llm("google/gemma-3-12b-it:free", "how can i know day from night?", OPENROUTER_API_KEY))
+# print(query_llm("mistralai/mistral-7b-instruct:free", "what is today's date?", OPENROUTER_API_KEY))

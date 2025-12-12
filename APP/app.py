@@ -8,7 +8,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 
-
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(CURRENT_DIR)
 sys.path.append(PARENT_DIR)
@@ -21,18 +20,20 @@ from InputPreprocessing.intent_classifier import classify_intent
 from InputPreprocessing.entity_extractions import extract_entities
 from GraphRetrievalLayer.Baseline import GraphRetrieval
 from LLMLayer.Baseline_Embeddings_Combined import combine_retrieval_results
+from Model_Evaluation.model_evaluator import query_llm
 
 # --- OpenRouter Model Config ---
 MODELS = {
-    "llama3": "meta-llama/llama-3-8b-instruct",
-    "gemma2": "google/gemma-2-9b-it",
+    "llama3.3": "meta-llama/llama-3.3-70b-instruct:free",
+    "gemma3": "google/gemma-3-12b-it:free",
     "mistralai": "mistralai/mistral-7b-instruct:free"
 }
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # --- Streamlit Config ---
 st.set_page_config(
-    page_title="FPL Analytics | AI-Powered Insights",
+    page_title="FPL COMMAND CENTER | AI Analytics",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -41,7 +42,14 @@ st.set_page_config(
 # --- Global Theme CSS ---
 st.markdown("""
 <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    * { 
+        margin: 0; 
+        padding: 0; 
+        box-sizing: border-box;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
     
     :root {
         --white: #F6F7ED;
@@ -49,15 +57,16 @@ st.markdown("""
         --dark-blue: #001F3F;
         --mantis: #74C365;
         --forest-green: #00804C;
-        --secondary-blue: #1E488F;
+        --navy: #0a1f35;
     }
     
+    /* Main Background - Deep Tech Feel */
     .stApp {
-        background: linear-gradient(135deg, #001F3F 0%, #0a2d5a 50%, #001F3F 100%);
+        background: #000000;
         color: #F6F7ED;
     }
     
-    /* Animated background texture */
+    /* Animated Grid Background */
     .stApp::before {
         content: '';
         position: fixed;
@@ -66,22 +75,54 @@ st.markdown("""
         width: 100%;
         height: 100%;
         background-image: 
-            radial-gradient(circle at 20% 50%, rgba(219, 230, 76, 0.03) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(116, 195, 101, 0.03) 0%, transparent 50%);
+            linear-gradient(rgba(219, 230, 76, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(219, 230, 76, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
         pointer-events: none;
         z-index: 0;
+        animation: gridPulse 20s ease-in-out infinite;
     }
     
-    /* Main container */
+    @keyframes gridPulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.6; }
+    }
+    
+    /* Dynamic Gradient Overlay */
+    .stApp::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+            radial-gradient(ellipse at top left, rgba(219, 230, 76, 0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at bottom right, rgba(116, 195, 101, 0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at center, rgba(0, 31, 63, 0.4) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+        animation: gradientShift 15s ease infinite;
+    }
+    
+    @keyframes gradientShift {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    /* Main Container */
     .main {
         background: transparent;
-        padding: 2rem 1rem;
+        padding: 1.5rem 1rem;
+        position: relative;
+        z-index: 1;
     }
     
-    /* Sidebar styling */
+    /* Sidebar - Command Panel Style */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0a1f35 0%, #001F3F 100%);
-        border-right: 2px solid rgba(219, 230, 76, 0.2);
+        background: linear-gradient(180deg, #000000 0%, #001F3F 100%);
+        border-right: 3px solid #DBE64C;
+        box-shadow: 4px 0 20px rgba(219, 230, 76, 0.2);
     }
     
     [data-testid="stSidebar"] * {
@@ -90,34 +131,71 @@ st.markdown("""
     
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
         color: #DBE64C !important;
-        font-weight: 500;
-    }
-    
-    /* Headings */
-    h1 {
-        color: #DBE64C;
-        font-size: 2.5rem;
-        font-weight: 900;
-        text-shadow: 0 0 20px rgba(219, 230, 76, 0.3);
-        margin-bottom: 0.5rem;
+        font-weight: 600;
+        text-transform: uppercase;
         letter-spacing: 1px;
+        font-size: 0.75rem;
     }
     
-    h2, h3 {
+    /* Header Styles - Bold & Athletic */
+    h1 {
+        color: #F6F7ED;
+        font-size: 3.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: -1px;
+        margin-bottom: 0rem;
+        line-height: 1;
+        text-shadow: 0 0 40px rgba(219, 230, 76, 0.4);
+        position: relative;
+    }
+    
+    h1::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        width: 120px;
+        height: 4px;
+        background: linear-gradient(90deg, #DBE64C 0%, transparent 100%);
+    }
+    
+    h2 {
+        color: #DBE64C;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 1.1rem;
+    }
+    
+    h3 {
+        color: #74C365;
+        font-weight: 700;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    h4 {
         color: #DBE64C;
         font-weight: 700;
-        text-shadow: 0 0 10px rgba(219, 230, 76, 0.2);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
-    /* Neon card styling */
+    /* Premium Card Design */
     .neon-card {
-        background: linear-gradient(135deg, rgba(10, 45, 90, 0.6) 0%, rgba(0, 31, 63, 0.8) 100%);
-        border: 1.5px solid rgba(219, 230, 76, 0.3);
-        border-radius: 16px;
-        padding: 1.5rem;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 8px 32px rgba(219, 230, 76, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: linear-gradient(135deg, rgba(0, 31, 63, 0.4) 0%, rgba(0, 0, 0, 0.6) 100%);
+        border: 2px solid rgba(219, 230, 76, 0.4);
+        border-radius: 20px;
+        padding: 1.75rem;
+        backdrop-filter: blur(20px);
+        box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(219, 230, 76, 0.2),
+            0 0 40px rgba(219, 230, 76, 0.1);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
     }
@@ -125,188 +203,341 @@ st.markdown("""
     .neon-card::before {
         content: '';
         position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(219, 230, 76, 0.1), transparent);
+        transition: left 0.5s;
+    }
+    
+    .neon-card:hover::before {
+        left: 100%;
+    }
+    
+    .neon-card:hover {
+        border-color: #DBE64C;
+        box-shadow: 
+            0 12px 48px rgba(219, 230, 76, 0.3),
+            inset 0 1px 0 rgba(219, 230, 76, 0.3),
+            0 0 60px rgba(219, 230, 76, 0.2);
+        transform: translateY(-6px);
+    }
+    
+    /* Stat Card */
+    .stat-card {
+        background: linear-gradient(135deg, rgba(116, 195, 101, 0.15) 0%, rgba(0, 128, 76, 0.1) 100%);
+        border: 2px solid rgba(116, 195, 101, 0.5);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+    }
+    
+    .stat-card::after {
+        content: '';
+        position: absolute;
         top: -50%;
         right: -50%;
         width: 100%;
         height: 100%;
-        background: radial-gradient(circle, rgba(219, 230, 76, 0.1) 0%, transparent 70%);
-        pointer-events: none;
+        background: radial-gradient(circle, rgba(219, 230, 76, 0.15) 0%, transparent 70%);
     }
     
-    .neon-card:hover {
-        border-color: rgba(219, 230, 76, 0.6);
-        box-shadow: 0 12px 48px rgba(219, 230, 76, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-        transform: translateY(-4px);
-    }
-    
-    /* Buttons */
+    /* Buttons - Power Style */
     .stButton > button {
-        background: linear-gradient(135deg, #74C365 0%, #5a9f4f 100%);
-        color: #001F3F;
+        background: linear-gradient(135deg, #74C365 0%, #00804C 100%);
+        color: #000000;
         border: none;
-        border-radius: 12px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 700;
-        font-size: 0.95rem;
-        letter-spacing: 0.5px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(116, 195, 101, 0.2);
+        border-radius: 14px;
+        padding: 1rem 2rem;
+        font-weight: 800;
+        font-size: 0.9rem;
+        letter-spacing: 1px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 
+            0 4px 20px rgba(116, 195, 101, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
         text-transform: uppercase;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stButton > button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s;
+    }
+    
+    .stButton > button:hover::before {
+        left: 100%;
     }
     
     .stButton > button:hover {
-        background: linear-gradient(135deg, #DBE64C 0%, #b8d43d 100%);
-        box-shadow: 0 8px 25px rgba(219, 230, 76, 0.4);
-        transform: translateY(-2px);
+        background: linear-gradient(135deg, #DBE64C 0%, #74C365 100%);
+        box-shadow: 
+            0 8px 32px rgba(219, 230, 76, 0.6),
+            inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        transform: translateY(-3px) scale(1.02);
     }
     
-    /* Input fields */
+    /* Input Fields - High-Tech */
     .stTextInput > div > div > input,
     .stSelectbox > div > div > select,
     .stTextArea > div > div > textarea {
-        background: rgba(15, 35, 60, 0.8) !important;
-        border: 1.5px solid rgba(116, 195, 101, 0.3) !important;
-        border-radius: 12px !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+        border: 2px solid rgba(116, 195, 101, 0.4) !important;
+        border-radius: 14px !important;
         color: #F6F7ED !important;
-        padding: 0.75rem 1rem !important;
+        padding: 1rem 1.25rem !important;
         font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
     }
     
     .stTextInput > div > div > input:focus,
     .stSelectbox > div > div > select:focus,
     .stTextArea > div > div > textarea:focus {
         border-color: #DBE64C !important;
-        box-shadow: 0 0 15px rgba(219, 230, 76, 0.3) !important;
+        box-shadow: 0 0 20px rgba(219, 230, 76, 0.4) !important;
+        background: rgba(0, 31, 63, 0.4) !important;
     }
     
-    /* Chat messages */
+    /* Chat Messages - Enhanced */
     .stChatMessage {
-        border-radius: 16px;
-        padding: 1.25rem;
-        margin: 0.75rem 0;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(219, 230, 76, 0.2);
-        background: linear-gradient(135deg, rgba(10, 45, 90, 0.5) 0%, rgba(0, 31, 63, 0.7) 100%);
+        border-radius: 18px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        backdrop-filter: blur(20px);
+        border: 2px solid rgba(219, 230, 76, 0.3);
+        background: linear-gradient(135deg, rgba(0, 31, 63, 0.3) 0%, rgba(0, 0, 0, 0.5) 100%);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
     
-    /* Tabs */
+    .stChatMessage[data-testid="user-message"] {
+        border-color: rgba(116, 195, 101, 0.5);
+        background: linear-gradient(135deg, rgba(116, 195, 101, 0.15) 0%, rgba(0, 128, 76, 0.1) 100%);
+    }
+    
+    .stChatMessage[data-testid="assistant-message"] {
+        border-color: rgba(219, 230, 76, 0.5);
+        background: linear-gradient(135deg, rgba(219, 230, 76, 0.1) 0%, rgba(0, 31, 63, 0.2) 100%);
+    }
+    
+    /* Tabs - Modern */
     .stTabs [role="tab"] {
         border-radius: 12px 12px 0 0;
-        border: 1px solid rgba(116, 195, 101, 0.2);
-        color: #DBE64C;
-        font-weight: 600;
+        border: 2px solid rgba(116, 195, 101, 0.3);
+        color: #F6F7ED;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [role="tab"]:hover {
+        background: rgba(219, 230, 76, 0.1);
+        border-color: rgba(219, 230, 76, 0.5);
     }
     
     .stTabs [role="tab"][aria-selected="true"] {
         border-color: #DBE64C;
-        background: rgba(219, 230, 76, 0.1);
+        background: linear-gradient(180deg, rgba(219, 230, 76, 0.2) 0%, rgba(219, 230, 76, 0.05) 100%);
+        color: #DBE64C;
+        box-shadow: 0 -2px 10px rgba(219, 230, 76, 0.3);
     }
     
-    /* Expander */
+    /* Expander - Command Style */
     .streamlit-expanderHeader {
-        background: linear-gradient(135deg, rgba(116, 195, 101, 0.1) 0%, rgba(219, 230, 76, 0.05) 100%);
-        border-radius: 12px;
-        border: 1px solid rgba(116, 195, 101, 0.2);
+        background: linear-gradient(135deg, rgba(116, 195, 101, 0.15) 0%, rgba(0, 0, 0, 0.3) 100%);
+        border-radius: 14px;
+        border: 2px solid rgba(116, 195, 101, 0.4);
         color: #DBE64C !important;
-        font-weight: 600;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 1.25rem;
+        transition: all 0.3s ease;
     }
     
-    /* Metrics */
-    .metric-card {
-        background: linear-gradient(135deg, rgba(0, 128, 76, 0.2) 0%, rgba(116, 195, 101, 0.1) 100%);
-        border: 1px solid rgba(116, 195, 101, 0.3);
-        border-radius: 12px;
-        padding: 1rem;
-        text-align: center;
+    .streamlit-expanderHeader:hover {
+        border-color: #DBE64C;
+        background: linear-gradient(135deg, rgba(219, 230, 76, 0.15) 0%, rgba(116, 195, 101, 0.1) 100%);
+        box-shadow: 0 4px 15px rgba(219, 230, 76, 0.2);
     }
     
+    /* Metrics Display */
     .metric-value {
         color: #DBE64C;
-        font-size: 1.8rem;
+        font-size: 2.5rem;
         font-weight: 900;
+        text-shadow: 0 0 20px rgba(219, 230, 76, 0.5);
+        line-height: 1;
     }
     
     .metric-label {
-        color: rgba(246, 247, 237, 0.7);
-        font-size: 0.85rem;
-        margin-top: 0.5rem;
+        color: rgba(246, 247, 237, 0.6);
+        font-size: 0.75rem;
+        margin-top: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
     }
     
-    /* Info/Warning boxes */
-    .stInfo, .stWarning, .stSuccess {
-        border-radius: 12px;
-        border: 1.5px solid rgba(219, 230, 76, 0.4);
-        background: rgba(10, 45, 90, 0.6) !important;
+    /* Alert Boxes */
+    .stInfo, .stWarning, .stSuccess, .stError {
+        border-radius: 14px;
+        border: 2px solid rgba(219, 230, 76, 0.5);
+        background: rgba(0, 31, 63, 0.4) !important;
         color: #F6F7ED !important;
+        backdrop-filter: blur(10px);
+        padding: 1rem 1.25rem;
     }
     
-    /* Scrollbar */
+    /* Scrollbar - Sleek */
     ::-webkit-scrollbar {
-        width: 10px;
+        width: 12px;
     }
     
     ::-webkit-scrollbar-track {
-        background: rgba(0, 31, 63, 0.3);
+        background: rgba(0, 0, 0, 0.5);
         border-radius: 10px;
     }
     
     ::-webkit-scrollbar-thumb {
-        background: rgba(116, 195, 101, 0.5);
+        background: linear-gradient(180deg, #74C365 0%, #00804C 100%);
         border-radius: 10px;
+        border: 2px solid rgba(0, 0, 0, 0.3);
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(219, 230, 76, 0.6);
+        background: linear-gradient(180deg, #DBE64C 0%, #74C365 100%);
     }
     
-    /* Spinner animation */
+    /* Loading Spinner */
     @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.05); }
     }
     
     .spinner-text {
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        color: #DBE64C;
+        font-weight: 700;
     }
+    
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, #74C365 0%, #00804C 100%);
+        color: #000000;
+        box-shadow: 0 2px 10px rgba(116, 195, 101, 0.4);
+    }
+    
+    /* Divider */
+    hr {
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(219, 230, 76, 0.5), transparent);
+        margin: 1.5rem 0;
+    }
+    
+    /* Code Blocks */
+    code {
+        background: rgba(0, 0, 0, 0.6) !important;
+        border: 1px solid rgba(116, 195, 101, 0.3) !important;
+        border-radius: 6px !important;
+        color: #74C365 !important;
+        padding: 0.25rem 0.5rem !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Radio Buttons */
+    .stRadio > label {
+        color: #DBE64C !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        font-size: 0.75rem !important;
+        letter-spacing: 0.5px !important;
+    }
+    
+    .stRadio > div {
+        background: rgba(0, 31, 63, 0.3);
+        border-radius: 12px;
+        padding: 1rem;
+        border: 1px solid rgba(116, 195, 101, 0.2);
+    }
+    
+    /* Select Box */
+    .stSelectbox > label {
+        color: #DBE64C !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        font-size: 0.75rem !important;
+        letter-spacing: 0.5px !important;
+    }
+            
+   /* REMOVE ALL SIDEBAR TOP SPACING (strongest override) */
+    [data-testid="stSidebar"] {
+        padding-top: 0 !important;
+    }
+
+    /* REMOVE INTERNAL CONTAINER SPACING */
+    [data-testid="stSidebar"] .block-container {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* REMOVE EXTRA EMPTY DIVS STREAMLIT INJECTS */
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* HEADER ITSELF — ultra-tight */
+    .sidebar-header-tight {
+        margin: 0 !important;
+        padding: 0.2rem 0 !important; /* reduce this further if needed */
+        line-height: 1 !important;
+    }
+
+    /* OPTIONAL: shrink icon */
+    .sidebar-header-tight img,
+    .sidebar-header-tight svg {
+        width: 22px !important;
+        height: 22px !important;
+        vertical-align: middle !important;
+    }
+            
+    /* Reduce space above the Pro Insight card */
+    .pro-insight {
+        margin-top: -40px !important;   /* Try -10, -20, -30 depending on how high you want it */
+    }
+
+     /* Add margin below selectbox and radio buttons */
+    .stSelectbox, 
+    .stRadio {
+        margin-bottom: 0.25rem !important; /* adjust the value as needed */
+    }
+
+
 </style>
 """, unsafe_allow_html=True)
-
-# --- Helper Functions (UNCHANGED LOGIC) ---
-def generate_llm_response(model_name, context, user_query, intent):
-    """Generate LLM response using OpenRouter API."""
-    system_prompt = f"""
-You are an expert Fantasy Premier League (FPL) Assistant.
-
-Your Task: Answer the user's question strictly based on the provided Context.
-User Intent: {intent}
-
-Context:
-{context}
-
-Guidelines:
-1. Be helpful, concise, and enthusiastic (like a football commentator).
-2. If the answer is not in the context, admit you don't know.
-3. Use bolding for player names and key stats.
-4. If recommending players, explain WHY based on stats.
-"""
-    model_id = MODELS.get(model_name)
-    if not model_id:
-        return "⚠️ Selected model is not available."
-
-    body = {
-        "model": model_id,
-        "messages": [{"role": "user", "content": f"User Query: {user_query}\n\nSystem Instructions: {system_prompt}"}]
-    }
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-
-    try:
-        start_time = time.time()
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=body)
-        data = response.json()
-        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "No answer returned.")
-        return answer
-    except Exception as e:
-        return f"❌ Error calling model: {str(e)}"
 
 def format_context_for_display(results):
     """Format context results for display."""
@@ -332,77 +563,105 @@ def visualize_graph(baseline_results):
                     G.add_edge(nodes[i], nodes[i+1])
     
     pos = nx.spring_layout(G, k=2, iterations=50)
-    fig, ax = plt.subplots(figsize=(8, 6), facecolor='#001F3F')
+    fig, ax = plt.subplots(figsize=(10, 7), facecolor='#000000')
     
-    nx.draw_networkx_nodes(G, pos, node_color='#74C365', node_size=1200, ax=ax, alpha=0.9)
-    nx.draw_networkx_edges(G, pos, edge_color='#DBE64C', width=2, ax=ax, alpha=0.6)
-    nx.draw_networkx_labels(G, pos, font_color='#001F3F', font_weight='bold', font_size=9, ax=ax)
+    nx.draw_networkx_nodes(G, pos, node_color='#74C365', node_size=1500, ax=ax, alpha=0.9, 
+                          edgecolors='#DBE64C', linewidths=2)
+    nx.draw_networkx_edges(G, pos, edge_color='#DBE64C', width=3, ax=ax, alpha=0.7, 
+                          style='solid')
+    nx.draw_networkx_labels(G, pos, font_color='#000000', font_weight='bold', 
+                           font_size=10, ax=ax)
     
-    ax.set_facecolor('#001F3F')
+    ax.set_facecolor('#000000')
     ax.axis('off')
+    fig.tight_layout()
     st.pyplot(fig)
 
 # --- Sidebar Configuration ---
 with st.sidebar:
     st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚽</div>
-        <h2 style="margin: 0; font-size: 1.3rem; text-shadow: 0 0 15px rgba(219, 230, 76, 0.4);">FPL Analytics</h2>
-        <p style="color: rgba(246, 247, 237, 0.7); font-size: 0.85rem; margin-top: 0.25rem;">AI-Powered Intelligence</p>
+    <div class="sidebar-header-tight">
+    <span style="font-size: 1.1rem; font-weight: 800; color: #DBE64C;">
+        ⚽ FPL COMMAND CENTER
+    </span>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    st.markdown("<hr>", unsafe_allow_html=True)
     
-    st.markdown("<h3 style='color: #DBE64C;'>⚙️ Configuration</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-bottom: 1.25rem; font-size: 1rem;'>⚙️ SYSTEM CONFIG</h2>", unsafe_allow_html=True)
     
     model_choice = st.selectbox(
-        "🧠 Select LLM Model",
-        ["llama3", "gemma2", "mistralai"],
+        "🧠 AI MODEL",
+        ["llama3.3", "gemma3", "mistralai"],
         index=0,
-        help="Choose the AI model for generating insights"
+        help="Select the AI engine for analysis"
     )
     
     retrieval_method = st.radio(
-        "🔍 Retrieval Strategy",
+        "🔍 RETRIEVAL MODE",
         ["Baseline Only", "Embedding Only", "Baseline + Embedding"],
         index=2,
-        help="Select how to retrieve and combine results"
+        help="Choose data retrieval strategy"
     )
     
-    st.markdown("---")
+    # --- Show embedding model ONLY if needed ---
+    if retrieval_method in ["Embedding Only", "Baseline + Embedding"]:
+        embed_model = st.selectbox(
+            "🧩 EMBEDDING ENGINE",
+            ["minilm", "mpnet"],
+            index=0,
+            help="Semantic search model"
+        )
+    else:
+        embed_model = None
+
+    st.markdown("<hr style='margin-top: 1rem;>", unsafe_allow_html=True)
     
     st.markdown("""
-    <div class="neon-card" style="margin-top: 1rem;">
-        <div style="color: #DBE64C; font-weight: 700; margin-bottom: 0.5rem;">💡 Pro Tip</div>
-        <div style="font-size: 0.9rem; color: rgba(246, 247, 237, 0.85); line-height: 1.5;">
-            <strong>Baseline + Embedding</strong> combines exact keyword matches with semantic search for superior accuracy.
+    <div class="neon-card" style="margin-top: -0.75rem;">
+        <div style="color: #DBE64C; font-weight: 800; margin-bottom: 0.75rem; 
+                    font-size: 0.8rem; text-transform: uppercase; 
+                    letter-spacing: 0.5px; margin-top: -0.7rem;">
+            💡 PRO INSIGHT
+        </div>
+        <div style="font-size: 0.85rem; color: rgba(246, 247, 237, 0.8); 
+                    line-height: 1.6; font-weight: 500;">
+            <strong style="color: #74C365;">Baseline + Embedding</strong> mode delivers maximum accuracy by combining keyword precision with semantic intelligence.
         </div>
     </div>
     """, unsafe_allow_html=True)
+
     
-    st.markdown("---")
-    st.caption("📊 FPL Graph-RAG v1.0 | Powered by AI")
+    st.markdown("<hr style='margin-top: 2rem;'>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="text-align: center; margin-top: 1.5rem;">
+        <div class="status-badge">SYSTEM ACTIVE</div>
+        <p style="color: rgba(246, 247, 237, 0.5); font-size: 0.7rem; margin-top: 1rem; font-weight: 600;">GRAPH-RAG v1.0</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- Main Interface ---
 st.markdown("""
-<div style="margin-bottom: 0.5rem;">
-    <h1 style="display: inline-block; margin-right: 1rem;">⚽ FPL Analytics</h1>
-    <span style="color: #74C365; font-size: 1rem; vertical-align: middle;">AI-Powered Insights</span>
+<div style="margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <h1 style="margin: 0;">FPL ANALYTICS</h1>
+        <span class="status-badge">LIVE</span>
+    </div>
+    <p style="color: rgba(246, 247, 237, 0.7); font-size: 1.1rem; font-weight: 500; line-height: 1.5;">
+        Advanced AI-powered intelligence for <span style="color: #74C365; font-weight: 700;">Player Performance</span> • 
+        <span style="color: #74C365; font-weight: 700;">Match Fixtures</span> • 
+        <span style="color: #74C365; font-weight: 700;">Team Analysis</span> • 
+        <span style="color: #74C365; font-weight: 700;">Strategic Recommendations</span>
+    </p>
 </div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<p style="color: rgba(246, 247, 237, 0.8); font-size: 1.05rem; margin-bottom: 1.5rem;">
-    Ask about <strong style="color: #74C365;">Player Stats</strong> • <strong style="color: #74C365;">Fixtures</strong> • 
-    <strong style="color: #74C365;">Team Analysis</strong> • <strong style="color: #74C365;">Fantasy Recommendations</strong>
-</p>
 """, unsafe_allow_html=True)
 
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "👋 Hello Manager! Welcome to FPL Analytics. I'm here to help you dominate your Fantasy Premier League season with AI-powered insights. Who are we analyzing today?"}
+        {"role": "assistant", "content": "🎯 **WELCOME TO THE COMMAND CENTER** \n\nYour AI analytics system is online and ready. I'm here to provide elite-level insights for your Fantasy Premier League strategy. Let's dominate the competition. What intelligence do you need today?"}
     ]
 
 # Display chat history
@@ -411,7 +670,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # --- Chat Input & Processing ---
-if prompt := st.chat_input("🔍 Ask about players, fixtures, tactics, or get recommendations..."):
+if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, recommendations..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -420,25 +679,24 @@ if prompt := st.chat_input("🔍 Ask about players, fixtures, tactics, or get re
         message_placeholder = st.empty()
         full_response = ""
         
-        with st.spinner("🔎 Scouting the database..."):
+        with st.spinner("⚡ ANALYZING DATA..."):
             try:
-                # Preprocessing (UNCHANGED)
+                # Preprocessing
                 intent = classify_intent(prompt)
                 entities = extract_entities(prompt)
 
-                # Retrieval (UNCHANGED)
+                # Retrieval
                 baseline_results = {}
                 vector_results = []
 
                 if retrieval_method in ["Baseline Only", "Baseline + Embedding"]:
                     graph_retriever = GraphRetrieval()
                     baseline_results = graph_retriever.retrieve_kg_context(entities, intent)
-                    graph_retriever.close()
 
                 if retrieval_method in ["Embedding Only", "Baseline + Embedding"]:
                     vector_results = []
 
-                # Combine Results (UNCHANGED)
+                # Combine Results
                 if retrieval_method == "Baseline + Embedding":
                     flattened_baseline = format_context_for_display(baseline_results)
                     combined_context = combine_retrieval_results(flattened_baseline, vector_results)
@@ -451,41 +709,57 @@ if prompt := st.chat_input("🔍 Ask about players, fixtures, tactics, or get re
                 if not context_str:
                     context_str = "No specific data found in the Knowledge Graph for this query."
 
-                # LLM Response (UNCHANGED)
-                full_response = generate_llm_response(model_choice, context_str, prompt, intent)
+                # LLM Response
+                model_id = MODELS.get(model_choice)
+                prompt_str = f"""
+Context:
+- Player: Harry Kane, Total Points: 210
+- Player: Mohamed Salah, Total Points: 205
+- Player: Arsenal Top Midfielder: Kevin De Bruyne, Assists: 12
+
+Persona:
+You are an elite FPL analytics expert delivering high-impact insights.
+
+Task:
+Answer the user's question using only the information above. Be concise, strategic, and data-driven.
+
+Question:
+{prompt}
+"""
+                full_response = query_llm(model_id, prompt_str, OPENROUTER_API_KEY).get("answer")
                 message_placeholder.markdown(full_response)
 
                 # --- Transparency UI ---
-                with st.expander("🧐 View Retrieval Details"):
-                    tab1, tab2, tab3, tab4 = st.tabs(["Entities & Intent", "Context", "Queries", "Graph"])
+                with st.expander("🔬 DETAILED ANALYTICS BREAKDOWN"):
+                    tab1, tab2, tab3, tab4 = st.tabs(["🎯 INTENT & ENTITIES", "📊 CONTEXT DATA", "⚙️ QUERY LOG", "🕸️ KNOWLEDGE GRAPH"])
                     
                     with tab1:
-                        st.markdown("<h4 style='color: #DBE64C;'>Detected Intent</h4>", unsafe_allow_html=True)
+                        st.markdown("<h3>DETECTED INTENT</h3>", unsafe_allow_html=True)
                         st.code(intent, language="text")
-                        st.markdown("<h4 style='color: #DBE64C; margin-top: 1rem;'>Extracted Entities</h4>", unsafe_allow_html=True)
+                        st.markdown("<h3 style='margin-top: 1.5rem;'>EXTRACTED ENTITIES</h3>", unsafe_allow_html=True)
                         st.json(entities)
                     
                     with tab2:
-                        st.markdown("<h4 style='color: #DBE64C;'>Context for LLM</h4>", unsafe_allow_html=True)
-                        st.text_area("", context_str, height=250, disabled=True)
+                        st.markdown("<h3>LLM CONTEXT INPUT</h3>", unsafe_allow_html=True)
+                        st.text_area("", context_str, height=300, disabled=True, label_visibility="collapsed")
 
                     with tab3:
-                        st.markdown("<h4 style='color: #DBE64C;'>Cypher Queries</h4>", unsafe_allow_html=True)
+                        st.markdown("<h3>EXECUTED CYPHER QUERIES</h3>", unsafe_allow_html=True)
                         if baseline_results:
                             for query_key in baseline_results.keys():
-                                st.code(f"MATCH (n)-[r]->(m) WHERE ... RETURN ...  // {query_key}", language="cypher")
+                                st.code(f"MATCH (n)-[r]->(m) WHERE ... RETURN ...  // Query: {query_key}", language="cypher")
                         else:
-                            st.info("No Cypher queries executed for this request.")
+                            st.info("⚠️ No Cypher queries executed for this request.")
                     
                     with tab4:
-                        st.markdown("<h4 style='color: #DBE64C;'>Knowledge Graph Visualization</h4>", unsafe_allow_html=True)
+                        st.markdown("<h3>GRAPH VISUALIZATION</h3>", unsafe_allow_html=True)
                         if baseline_results:
                             visualize_graph(baseline_results)
                         else:
-                            st.info("No graph data available for visualization.")
+                            st.info("⚠️ No graph data available for visualization.")
 
             except Exception as e:
-                st.error(f"⚠️ An error occurred: {e}")
-                full_response = "I encountered an error processing your request. Please try again."
+                st.error(f"⚠️ SYSTEM ERROR: {e}")
+                full_response = "⚠️ An error occurred during analysis. Please retry your request."
 
     st.session_state.messages.append({"role": "assistant", "content": full_response})
