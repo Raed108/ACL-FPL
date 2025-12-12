@@ -83,35 +83,12 @@ def create_all_node_embeddings():
 
 
 
-# def semantic_player_search(query_vec: list, model_choice: str = "mpnet", limit: int = 5):
-#     """
-#     Performs semantic similarity search on Player nodes.
-#     Uses the correct embedding based on selected model.
-#     """
-#     embedding_property = f"embedding_{model_choice}"
-
-#     cypher = f"""
-#     WITH $query_vec AS qvec
-#     MATCH (p:Player)
-#     WHERE p.{embedding_property} IS NOT NULL
-#     RETURN 
-#         p.player_name AS name,
-#         gds.similarity.cosine(p.{embedding_property}, qvec) AS score
-#     ORDER BY score DESC
-#     LIMIT $limit
-#     """
-
-#     with driver.session() as session:
-#         results = session.run(cypher, query_vec=query_vec, limit=limit)
-#         return [record.data() for record in results]
-    
-
-
-
-def semantic_search(query_vec: list, model_choice: str = "mpnet", limit: int = 5):
+def semantic_search(query: list, model_choice: str = "mpnet", limit: int = 5):
     """
     Generic semantic search over ALL nodes in the KG.
     """
+    query_vec = embed_user_query(query, model_choice)
+
     embedding_property = f"embedding_{model_choice}"
 
     cypher = f"""
@@ -442,22 +419,20 @@ def cypher_recommend(season: str = None, position: str = None):
 
 
 # Update the answer_query function to use the new multi-query structure
-def answer_query(user_input: str, model_choice="mpnet"):
+def answer_query(user_input: str, entities, intent, model_choice="mpnet"):
     # 1. Classify intent
-    intent = classify_intent(user_input)
+    # intent = classify_intent(user_input)
     # intent = classify_intent_llm(user_input)
     
     # 2. Extract entities
-    entities = extract_entities(user_input)
+    # entities = extract_entities(user_input)
     # entities = extract_entities_with_llm(user_input)
 
     season = entities.get("season", [None])[0] if entities.get("season") else None
-    
-    # 3. Embed user query
-    qvec = embed_user_query(user_input, model_choice)
-    
+
+
     # 4. Retrieve top similar nodes
-    candidates = semantic_search(qvec, model_choice=model_choice, limit=5)
+    candidates = semantic_search(user_input, model_choice=model_choice, limit=5)
     
     # 5. Include all cosine similarity scores
     results_with_scores = []
