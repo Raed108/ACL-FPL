@@ -1,8 +1,9 @@
 import os
 from sentence_transformers import SentenceTransformer
 from neo4j import GraphDatabase
-from InputPreprocessing.intent_classifier import classify_intent
-from InputPreprocessing.entity_extractions import extract_entities
+from InputPreprocessing.intent_classifier import classify_intent, classify_intent_llm
+from InputPreprocessing.entity_extractions import extract_entities, extract_entities_with_llm
+from InputPreprocessing.input_embedding import embed_user_query
 
 
 URI = os.getenv("URI")
@@ -21,15 +22,6 @@ models = {
     "minilm": SentenceTransformer(MODEL_MINILM),
     "mpnet": SentenceTransformer(MODEL_MPNET)
 }
-
-
-def embed_user_query(text: str, model_choice: str = "minilm"):
-    """
-    Convert user text query into an embedding using the SELECTED model.
-    """
-    model = models[model_choice]
-    vector = model.encode(text).tolist()
-    return vector
 
 
 def build_node_text(label: str, props: dict):
@@ -453,9 +445,12 @@ def cypher_recommend(season: str = None, position: str = None):
 def answer_query(user_input: str, model_choice="mpnet"):
     # 1. Classify intent
     intent = classify_intent(user_input)
+    # intent = classify_intent_llm(user_input)
     
     # 2. Extract entities
     entities = extract_entities(user_input)
+    # entities = extract_entities_with_llm(user_input)
+
     season = entities.get("season", [None])[0] if entities.get("season") else None
     
     # 3. Embed user query

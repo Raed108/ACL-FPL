@@ -32,7 +32,7 @@ class Entity(BaseModel):
     )
     season: List[str] = Field(
         default_factory=list,
-        description="List of football seasons referenced in the query (e.g., '2023/24'). May be empty."
+        description="List of football seasons referenced in the query and should be full season format like \"2022-23\" e.g if user enters(2022 or 22), and we have only 2 seasons 2021-22 and 2022-23, if else return embt list"
     )
     gameweek: List[str] = Field(
         default_factory=list,
@@ -48,23 +48,9 @@ class Entity(BaseModel):
     )
 
 
+
 def extract_entities_with_llm(user_query: str):
     prompt = f"""
-    Extract *all* possible entities from the user query. 
-    Return EVERY entity as a LIST, even if only one value is found.
-
-    
-
-    Rules:
-    - Always return lists.
-    - If nothing is found for an entity, return an empty list [].
-    - "season" should be full season format like "2022-23" if mentioned.
-    - "position" must be mapped to one of: GK, DEF, MID, FWD.
-    - "statistic" must be mapped to one of:
-      goals, assists, saves, minutes, bonus, clean sheets,
-      goals conceded, own goals, penalties saved, penalties missed,
-      yellow cards, red cards, total points, bps, form, threat,
-      creativity, influence.
 
 
     User Query: "{user_query}"
@@ -79,12 +65,8 @@ def extract_entities_with_llm(user_query: str):
     },
     )
 
-    # json_text = response.candidates[0].content.parts[0].text.strip()
 
-    # You may parse JSON here:
-    # return json.loads(json_text)
-
-    json_text = Entity.model_validate_json(response.text)
+    json_text = json.loads(response.text)
     return json_text
 
 
