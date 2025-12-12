@@ -21,6 +21,7 @@ from InputPreprocessing.intent_classifier import classify_intent
 from InputPreprocessing.entity_extractions import extract_entities
 from GraphRetrievalLayer.Baseline import GraphRetrieval
 from LLMLayer.Baseline_Embeddings_Combined import combine_retrieval_results
+from GraphRetrievalLayer.embedding import answer_query, semantic_search
 
 # --- OpenRouter Model Config ---
 MODELS = {
@@ -369,6 +370,13 @@ with st.sidebar:
         index=2,
         help="Select how to retrieve and combine results"
     )
+
+    embed_model = st.selectbox(
+        "🧩 Embedding Model",
+        ["minilm", "mpnet"],
+        index=1,
+        help="Choose the embedding model for semantic search"
+    )
     
     st.markdown("---")
     
@@ -430,20 +438,22 @@ if prompt := st.chat_input("🔍 Ask about players, fixtures, tactics, or get re
                 baseline_results = {}
                 vector_results = []
 
-                if retrieval_method in ["Baseline Only", "Baseline + Embedding"]:
+                if retrieval_method == "Baseline Only":
                     graph_retriever = GraphRetrieval()
                     baseline_results = graph_retriever.retrieve_kg_context(entities, intent)
-                    graph_retriever.close()
 
-                if retrieval_method in ["Embedding Only", "Baseline + Embedding"]:
-                    vector_results = []
+                elif retrieval_method == "Embedding Only":
+                    vector_results = semantic_search(prompt, embed_model)
+                
+                elif retrieval_method == "Baseline + Embedding":
+                    vector_results = answer_query(prompt, embed_model)
+
 
                 # Combine Results (UNCHANGED)
                 if retrieval_method == "Baseline + Embedding":
-                    flattened_baseline = format_context_for_display(baseline_results)
-                    combined_context = combine_retrieval_results(flattened_baseline, vector_results)
+                    combined_context = combine_retrieval_results(baseline_results, vector_results)
                 elif retrieval_method == "Baseline Only":
-                    combined_context = format_context_for_display(baseline_results)
+                    combined_context = format_context_for_display(baseline_results,[])
                 else:
                     combined_context = vector_results
 
