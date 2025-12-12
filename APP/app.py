@@ -552,6 +552,29 @@ def format_context_for_display(results):
                 formatted_list.append(value)
     return formatted_list
 
+def normalize_baseline_results(results):
+    """
+    Normalize baseline results so all player dicts have the same keys.
+    Missing keys are filled with None.
+    """
+    normalized_list = []
+
+    if not isinstance(results, dict):
+        return results  # fallback if results are not a dict
+
+    for key, data_list in results.items():
+        for r in data_list:
+            if isinstance(r, dict):
+                normalized = {
+                    "player": r.get("player"),
+                    "position": r.get("position"),
+                    "total_points": r.get("total_points"),
+                    "pts_per_90": r.get("pts_per_90"),
+                    "form_score": r.get("form_score")
+                }
+                normalized_list.append(normalized)
+    return normalized_list
+
 def visualize_graph(baseline_results):
     """Create a NetworkX graph visualization from KG results."""
     G = nx.Graph()
@@ -569,7 +592,7 @@ def visualize_graph(baseline_results):
                           edgecolors='#DBE64C', linewidths=2)
     nx.draw_networkx_edges(G, pos, edge_color='#DBE64C', width=3, ax=ax, alpha=0.7, 
                           style='solid')
-    nx.draw_networkx_labels(G, pos, font_color='#000000', font_weight='bold', 
+    nx.draw_networkx_labels(G, pos, font_color='#F6F8ED', font_weight='bold', 
                            font_size=10, ax=ax)
     
     ax.set_facecolor('#000000')
@@ -700,7 +723,7 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
                 if retrieval_method == "Baseline + Embedding":
                     combined_context = combine_retrieval_results(baseline_results, vector_results)
                 elif retrieval_method == "Baseline Only":
-                    combined_context = format_context_for_display(baseline_results,[])
+                    combined_context = normalize_baseline_results(baseline_results)
                 else:
                     combined_context = vector_results
 
