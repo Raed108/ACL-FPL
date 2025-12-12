@@ -1,23 +1,27 @@
 from langchain.prompts import PromptTemplate
-from Baseline_Embeddings_Combined import combine_retrieval_results
 
-def create_prompt_template(baseline_results, vector_results, user_question):
+def create_prompt_template(context, user_question):
     """
-    Creates a prompt template that combines results from baseline and vector searches.
+    Creates and formats a prompt string using baseline and vector search results.
     """
-    combined_context = combine_retrieval_results(baseline_results, vector_results)
-    persona = "You are an FPL expert."
-    # Format the combined context into a string for the prompt
-    context_str = "\n".join([f"- {item}" for item in combined_context])
+    persona = "FPL expert"
     
-    prompt_template = PromptTemplate(
-        input_variables=[user_question],
-        template=f"""
-{persona} Use the following context to answer the question.
-Context:
-{context_str}
-
-Question: {{{user_question}}}
-"""
+    # 1. Define the template string
+    template = (
+        "You are an {persona}. Use the following context to answer the question.\n"
+        "Context:\n{context}\n"
+        "Question: {user_question}"
     )
-    return prompt_template
+
+    # 2. Create the PromptTemplate object
+    prompt_template = PromptTemplate(
+        template=template, 
+        input_variables=["persona", "context", "user_question"]
+    )
+    
+    # 3. Format the prompt using the function arguments and the local persona variable
+    return prompt_template.format(
+        persona=persona, 
+        context=context, 
+        user_question=user_question
+    )
