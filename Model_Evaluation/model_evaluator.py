@@ -22,7 +22,7 @@ def query_llm(model_name, prompt_str, api_key):
         if "choices" in data:
             answer = data["choices"][0]["message"]["content"]
             usage = data.get("usage", {})
-        elif "result" in data:  # fallback for Qwen-style output
+        elif "result" in data:  
             answer = data["result"]
             usage = {}
         else:
