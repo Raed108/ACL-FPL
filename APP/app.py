@@ -16,7 +16,7 @@ sys.path.append(PARENT_DIR)
 load_dotenv()
 
 # --- User Modules ---
-from InputPreprocessing.intent_classifier import classify_intent
+from InputPreprocessing.intent_classifier import classify_intent, classify_intent_llm
 from InputPreprocessing.entity_extractions import extract_entities
 from GraphRetrievalLayer.Baseline import GraphRetrieval
 from GraphRetrievalLayer.embedding import answer_query, semantic_search
@@ -707,7 +707,8 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
         with st.spinner("⚡ ANALYZING DATA..."):
             try:
                 # Preprocessing
-                intent = classify_intent(prompt)
+                # intent = classify_intent(prompt)
+                intent = classify_intent_llm(prompt)
                 entities = extract_entities(prompt)
 
                 # Retrieval and Combine Results
