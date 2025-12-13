@@ -17,7 +17,7 @@ load_dotenv()
 
 # --- User Modules ---
 from InputPreprocessing.intent_classifier import classify_intent, classify_intent_llm
-from InputPreprocessing.entity_extractions import extract_entities
+from InputPreprocessing.entity_extractions import extract_entities, extract_entities_with_llm
 from GraphRetrievalLayer.Baseline import GraphRetrieval
 from GraphRetrievalLayer.embedding import answer_query, semantic_search
 from LLMLayer.Baseline_Embeddings_Combined import combine_retrieval_results
@@ -709,7 +709,8 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
                 # Preprocessing
                 # intent = classify_intent(prompt)
                 intent = classify_intent_llm(prompt)
-                entities = extract_entities(prompt)
+                # entities = extract_entities(prompt)
+                entities = extract_entities_with_llm(prompt)
 
                 # Retrieval and Combine Results
                 baseline_results = {}
