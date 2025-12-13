@@ -8,7 +8,7 @@ def create_prompt_template(context, user_question):
     
     # 1. Define the template string
     template = (
-        "You are an {persona}. Use the following context to answer the question.\n"
+        "You are an {persona}. Use the following context to answer the question. If the question asks about statistics in seasons other than 2022-23 and 2021-22, do not use the context to answer it.\n"
         "Context:\n{context}\n"
         "Question: {user_question}"
     )
