@@ -19,7 +19,9 @@ load_dotenv()
 from InputPreprocessing.intent_classifier import classify_intent
 from InputPreprocessing.entity_extractions import extract_entities
 from GraphRetrievalLayer.Baseline import GraphRetrieval
+from GraphRetrievalLayer.embedding import answer_query, semantic_search
 from LLMLayer.Baseline_Embeddings_Combined import combine_retrieval_results
+from LLMLayer.Prompt_Structure import create_prompt_template
 from Model_Evaluation.model_evaluator import query_llm
 
 # --- OpenRouter Model Config ---
@@ -708,24 +710,23 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
                 intent = classify_intent(prompt)
                 entities = extract_entities(prompt)
 
-                # Retrieval
+                # Retrieval and Combine Results
                 baseline_results = {}
                 vector_results = []
 
                 if retrieval_method == "Baseline Only":
                     graph_retriever = GraphRetrieval()
                     baseline_results = graph_retriever.retrieve_kg_context(entities, intent)
+                    combined_context = combine_retrieval_results(baseline_results=baseline_results)
 
-                if retrieval_method in ["Embedding Only", "Baseline + Embedding"]:
-                    vector_results = []
+                elif retrieval_method =="Embedding Only":
+                    vector_results = semantic_search(prompt, embed_model)
+                    combined_context = combine_retrieval_results(vector_results=vector_results)
 
-                # Combine Results
-                if retrieval_method == "Baseline + Embedding":
-                    combined_context = combine_retrieval_results(baseline_results, vector_results)
-                elif retrieval_method == "Baseline Only":
-                    combined_context = normalize_baseline_results(baseline_results)
-                else:
-                    combined_context = vector_results
+                elif retrieval_method == "Baseline + Embedding":
+                    vector_results = answer_query(prompt, entities, intent, embed_model)
+                    combined_context = combine_retrieval_results(hybrid_results=vector_results)
+
 
                 context_str = "\n".join([str(item) for item in combined_context])
                 if not context_str:
@@ -733,21 +734,8 @@ if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, re
 
                 # LLM Response
                 model_id = MODELS.get(model_choice)
-                prompt_str = f"""
-Context:
-- Player: Harry Kane, Total Points: 210
-- Player: Mohamed Salah, Total Points: 205
-- Player: Arsenal Top Midfielder: Kevin De Bruyne, Assists: 12
 
-Persona:
-You are an elite FPL analytics expert delivering high-impact insights.
-
-Task:
-Answer the user's question using only the information above. Be concise, strategic, and data-driven.
-
-Question:
-{prompt}
-"""
+                prompt_str = create_prompt_template(combined_context, prompt)
                 full_response = query_llm(model_id, prompt_str, OPENROUTER_API_KEY).get("answer")
                 message_placeholder.markdown(full_response)
 
