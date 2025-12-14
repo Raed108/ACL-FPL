@@ -40,6 +40,37 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+st.markdown("""
+<style>
+/* Chat input wrapper */
+div[data-testid="stChatInput"] {
+    position: relative;
+}
+
+/* Floating icon inside input */
+.chat-question-icon {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 1001;
+}
+
+/* Icon button style */
+.chat-question-icon button {
+    background: transparent !important;
+    border: none !important;
+    font-size: 1.35rem;
+    cursor: pointer;
+    padding: 0;
+    color: #DBE64C;
+}
+
+/* Prevent text overlap with icon */
+div[data-testid="stChatInput"] textarea {
+    padding-right: 3rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # --- Global Theme CSS ---
 st.markdown("""
@@ -541,6 +572,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+/* Fixed Quick Question Icon */
+.fixed-question-icon {
+    position: fixed;
+    bottom: 90px;               /* aligns with chat_input */
+    right: 30px;
+    z-index: 9999;
+}
+
+/* Make icon visually part of input */
+.fixed-question-icon button {
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 def format_context_for_display(results):
     """Format context results for display."""
     if isinstance(results, list):
@@ -683,10 +735,21 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ===============================
 # Initialize chat history
+# ===============================
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "🎯 **WELCOME TO THE COMMAND CENTER** \n\nYour AI analytics system is online and ready. I'm here to provide elite-level insights for your Fantasy Premier League strategy. Let's dominate the competition. What intelligence do you need today?"}
+        {
+            "role": "assistant",
+            "content": (
+                "🎯 **WELCOME TO THE COMMAND CENTER**\n\n"
+                "Your AI analytics system is online and ready. "
+                "I'm here to provide elite-level insights for your "
+                "Fantasy Premier League strategy. "
+                "What intelligence do you need today?"
+            )
+        }
     ]
 
 # Display chat history
@@ -694,84 +757,123 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- Chat Input & Processing ---
-if prompt := st.chat_input("⚡ Enter your query: players, fixtures, tactics, recommendations..."):
+
+# ===============================
+# Chat Input (FIXED POSITION)
+# ===============================
+typed_input = st.chat_input(
+    "⚡ Enter your query: players, fixtures, tactics, recommendations..."
+)
+
+
+# ===============================
+# Quick Questions (INSIDE input)
+# ===============================
+if "quick_question" not in st.session_state:
+    st.session_state.quick_question = None
+
+quick_questions = [
+    "Top performing players this week",
+    "Upcoming fixture analysis",
+    "Best captain recommendation",
+    "Team formation suggestions",
+    "Injury updates"
+]
+
+st.markdown('<div class="fixed-question-icon">', unsafe_allow_html=True)
+with st.popover("❓"):
+    st.markdown("### Quick Questions")
+    for i, q in enumerate(quick_questions):
+        if st.button(q, key=f"qq_fixed_{i}"):
+            st.session_state.quick_question = q
+            st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+# ===============================
+# Prompt Resolution Logic
+# ===============================
+prompt = None
+
+# Priority 1: quick question click
+if st.session_state.quick_question:
+    prompt = st.session_state.quick_question
+    st.session_state.quick_question = None  # reset after use
+
+# Priority 2: typed input (Enter)
+elif typed_input:
+    prompt = typed_input
+
+
+# ===============================
+# Chat Processing
+# ===============================
+if prompt:
+    # Add user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # Assistant response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        
+
         with st.spinner("⚡ ANALYZING DATA..."):
             try:
-                # Preprocessing
-                # intent = classify_intent(prompt)
+                # ---- YOUR EXISTING PIPELINE ----
                 intent = classify_intent_llm(prompt)
-                # entities = extract_entities(prompt)
                 entities = extract_entities_with_llm(prompt)
 
-                # Retrieval and Combine Results
                 baseline_results = {}
                 vector_results = []
 
                 if retrieval_method == "Baseline Only":
                     graph_retriever = GraphRetrieval()
-                    baseline_results = graph_retriever.retrieve_kg_context(entities, intent)
-                    combined_context = combine_retrieval_results(baseline_results=baseline_results)
+                    baseline_results = graph_retriever.retrieve_kg_context(
+                        entities, intent
+                    )
+                    combined_context = combine_retrieval_results(
+                        baseline_results=baseline_results
+                    )
 
-                elif retrieval_method =="Embedding Only":
+                elif retrieval_method == "Embedding Only":
                     vector_results = semantic_search(prompt, embed_model)
-                    combined_context = combine_retrieval_results(vector_results=vector_results)
+                    combined_context = combine_retrieval_results(
+                        vector_results=vector_results
+                    )
 
                 elif retrieval_method == "Baseline + Embedding":
-                    vector_results = answer_query(prompt, entities, intent, embed_model)
-                    combined_context = combine_retrieval_results(hybrid_results=vector_results)
+                    vector_results = answer_query(
+                        prompt, entities, intent, embed_model
+                    )
+                    combined_context = combine_retrieval_results(
+                        hybrid_results=vector_results
+                    )
 
+                context_str = (
+                    "\n".join(map(str, combined_context))
+                    or "No specific data found in the Knowledge Graph."
+                )
 
-                context_str = "\n".join([str(item) for item in combined_context])
-                if not context_str:
-                    context_str = "No specific data found in the Knowledge Graph for this query."
-
-                # LLM Response
                 model_id = MODELS.get(model_choice)
-
                 prompt_str = create_prompt_template(combined_context, prompt)
-                full_response = query_llm(model_id, prompt_str, OPENROUTER_API_KEY).get("answer")
+
+                full_response = query_llm(
+                    model_id, prompt_str, OPENROUTER_API_KEY
+                ).get("answer")
+
                 message_placeholder.markdown(full_response)
 
-                # --- Transparency UI ---
-                with st.expander("🔬 DETAILED ANALYTICS BREAKDOWN"):
-                    tab1, tab2, tab3, tab4 = st.tabs(["🎯 INTENT & ENTITIES", "📊 CONTEXT DATA", "⚙️ QUERY LOG", "🕸️ KNOWLEDGE GRAPH"])
-                    
-                    with tab1:
-                        st.markdown("<h3>DETECTED INTENT</h3>", unsafe_allow_html=True)
-                        st.code(intent, language="text")
-                        st.markdown("<h3 style='margin-top: 1.5rem;'>EXTRACTED ENTITIES</h3>", unsafe_allow_html=True)
-                        st.json(entities)
-                    
-                    with tab2:
-                        st.markdown("<h3>LLM CONTEXT INPUT</h3>", unsafe_allow_html=True)
-                        st.text_area("", context_str, height=300, disabled=True, label_visibility="collapsed")
-
-                    with tab3:
-                        st.markdown("<h3>EXECUTED CYPHER QUERIES</h3>", unsafe_allow_html=True)
-                        if baseline_results:
-                            for query_key in baseline_results.keys():
-                                st.code(f"MATCH (n)-[r]->(m) WHERE ... RETURN ...  // Query: {query_key}", language="cypher")
-                        else:
-                            st.info("⚠️ No Cypher queries executed for this request.")
-                    
-                    with tab4:
-                        st.markdown("<h3>GRAPH VISUALIZATION</h3>", unsafe_allow_html=True)
-                        if baseline_results:
-                            visualize_graph(baseline_results)
-                        else:
-                            st.info("⚠️ No graph data available for visualization.")
-
             except Exception as e:
+                full_response = (
+                    "⚠️ An error occurred during analysis. "
+                    "Please retry your request."
+                )
                 st.error(f"⚠️ SYSTEM ERROR: {e}")
-                full_response = "⚠️ An error occurred during analysis. Please retry your request."
 
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Save assistant message
+    st.session_state.messages.append(
+        {"role": "assistant", "content": full_response}
+    )
