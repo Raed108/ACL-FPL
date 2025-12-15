@@ -8,9 +8,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 
-# CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# PARENT_DIR = os.path.dirname(CURRENT_DIR)
-# sys.path.append(PARENT_DIR)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+sys.path.append(PARENT_DIR)
 
 # --- Load ENV ---
 load_dotenv()
@@ -872,8 +872,7 @@ if prompt:
                         st.markdown("<h3>GRAPH VISUALIZATION</h3>", unsafe_allow_html=True)
                         if baseline_results:
                             visualize_graph(baseline_results)
-                        # elif vector_results:
-                        #     visualize_graph(vector_results)
+                        
                         else:
                             st.info("⚠️ No graph data available for visualization.")
 

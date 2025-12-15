@@ -1,11 +1,24 @@
 import time
 import os
+import sys
 import requests
 import pandas as pd
 from dotenv import load_dotenv
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+sys.path.append(PARENT_DIR)
 
 load_dotenv()
+
+from LLMLayer.Baseline_Embeddings_Combined import combine_retrieval_results
+from LLMLayer.Prompt_Structure import create_prompt_template
+from InputPreprocessing.intent_classifier import classify_intent_llm
+from InputPreprocessing.entity_extractions import extract_entities_with_llm
+from GraphRetrievalLayer.embedding import answer_query
+
+
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 MODELS = {
@@ -70,21 +83,55 @@ class ModelEvaluator:
     def _load_test_queries(self):
         with open(self.test_queries_file, "r") as f:
             return [line.strip() for line in f if line.strip()]
+    
+    def build_prompt(self, question, combined_context):
+        return f"""
+    Context:
+    {combined_context}
 
-    def evaluate(self):
+    Persona:
+    You are an expert assistant.
+
+    Task:
+    Answer the user's question using ONLY the context above.
+
+    Question:
+    {question}
+"""
+
+
+    def evaluate(self, embed_model):
         results = []
 
         for model_name, model_id in MODELS.items():
             print(f"\nEvaluating model: {model_name}")
+
             for q in self.test_queries:
                 expected_keywords = [w for w in q.lower().split() if len(w) > 3]
 
-                prompt_str = self.prompt_template.format(question=q)
+                # ===== Retrieval pipeline =====
+                intent = classify_intent_llm(q)
+                entities = extract_entities_with_llm(q)
+
+                vector_results = answer_query(
+                    q,
+                    entities=entities,
+                    intent=intent,
+                    model_choice=embed_model
+                )
+
+                combined_context = combine_retrieval_results(
+                    hybrid_results=vector_results
+                )
+
+                # ===== Dynamic prompt =====
+                prompt_str = self.build_prompt(q, combined_context)
+
+                # ===== Query model =====
                 output = query_llm(model_id, prompt_str, self.api_key)
 
                 accuracy = compute_accuracy(output["answer"], expected_keywords)
 
-                # qualitative fields left EMPTY for human input
                 results.append({
                     "model": model_name,
                     "question": q,
@@ -94,6 +141,7 @@ class ModelEvaluator:
                     "tokens_in": output["tokens_in"],
                     "tokens_out": output["tokens_out"],
                     "total_tokens": output["total_tokens"],
+                    "cost": "free",
                     "qualitative_relevance": "",
                     "qualitative_correctness": "",
                     "qualitative_completeness": "",
@@ -103,19 +151,27 @@ class ModelEvaluator:
 
         df = pd.DataFrame(results)
         df.to_csv("model_comparison_results.csv", index=False)
-        print("\nSaved results → model_comparison_results.csv")
 
-        # Best model = only quantitative (accuracy)
         summary = df.groupby("model")[["accuracy"]].mean()
         best_model = summary["accuracy"].idxmax()
 
         print("\nBest model:", best_model)
         print(summary)
+
         return df, best_model
 
 
-# ==================== Example usage ====================
-# if __name__ == "__main__":
+
+if __name__ == "__main__":
+    embed_model = "minilm"
+
+    evaluator = ModelEvaluator(
+        prompt_template=None,  # no longer needed
+        api_key=OPENROUTER_API_KEY
+    )
+
+    df_results, best_model = evaluator.evaluate(embed_model)
+
 #     prompt_template = """
 # Context:
 # - Player: Harry Kane, Total Points: 210
