@@ -38,15 +38,13 @@ def classify_intent(user_input: str) -> str:
     text = user_input.lower().strip()
 
     # 1. Recommendation / Best / Top / Suggest
-    if any(word in text for word in ["recommend", "suggest", "best",  "captain", "vice-captain",
-                                     "who should i pick", "who to buy", "who to transfer", "budget",
-                                     "who should i pick", "who to buy", "who to transfer", "captain", "vice-captain"]):
+    if any(word in text for word in ["recommend", "suggest", "who should i pick", "who to buy", "who to transfer", "budget"]):
         return "recommendation"
 
     # 2. Player-specific stats/performance
     if any(word in text for word in ["how many", "how much", "points", "goals", "assists", "clean sheets",
                                      "bonus", "bps", "form", "ict", "threat", "creativity", "influence",
-                                     "played", "minutes", "xg", "xa", "performance", "stats", "scored"]):
+                                     "minutes", "xg", "xa", "performance", "stats", "scored"]):
         return "player_stats"
 
     # 3. Fixture / Match / Schedule
@@ -61,7 +59,7 @@ def classify_intent(user_input: str) -> str:
             return "team_analysis"
 
     # 5. Top Players / Comparison / History
-    if any(word in text for word in ["highest", "top ", "best", "most", "least", "ever", "all time",
+    if any(word in text for word in ["highest", "top ", "best", "most", "ever", "all time",
                                      "leaders", "better than", "who has the most", "highest scoring"]):
         return "top_players"
 

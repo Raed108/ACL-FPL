@@ -56,7 +56,8 @@ class GraphRetrieval:
                        sum(r.goals_scored) AS goals, 
                        sum(r.assists) AS assists, 
                        sum(r.clean_sheets) AS clean_sheets,
-                       sum(r.total_points) AS total_points
+                       sum(r.total_points) AS total_points,
+                       sum(r.bonus) AS total_bonus
             """)
 
             # 2. Recent Form (Last 5 Games Played)
@@ -137,9 +138,7 @@ class GraphRetrieval:
         # Intent: Fixture Query
         # -------------------------------------
         elif intent == "fixture_query":
-            # FIXED: Removed [:PLAYS_FOR]. Now relies on 'Team' entity to find fixtures.
-            # If user asks "Salah fixtures", this works best if 'Liverpool' is also extracted 
-            # or if the LLM infers the team.
+            # 1. Upcoming Fixtures for Team
             queries.append("""
                 MATCH (t:Team)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
                 WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
@@ -158,14 +157,14 @@ class GraphRetrieval:
         # Intent: Team Analysis
         # -------------------------------------
         elif intent == "team_analysis":
-            # FIXED: Removed [:PLAYS_FOR]. 
-            # Finds players who played in matches involving the specific team.
             
             # 1. Best Attackers (Goals/Assists in games involving this team)
             queries.append("""
                 MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
                 MATCH (p:Player)-[r:PLAYED_IN]->(f)
+                MATCH (p)-[:PLAYS_AS]->(pos:Position)
                 WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                    AND pos.name IN ['FW', 'MID']
                 RETURN p.player_name AS player, 
                        sum(r.goals_scored) AS goals, 
                        sum(r.assists) AS assists, 
@@ -180,10 +179,46 @@ class GraphRetrieval:
                 MATCH (p:Player)-[r:PLAYED_IN]->(f)
                 MATCH (p)-[:PLAYS_AS]->(pos:Position)
                 WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
-                  AND pos.name = 'GK' 
+                  AND pos.name IN ['DEF', 'GK']
                 RETURN t.name AS team, 
                        sum(r.clean_sheets) AS total_clean_sheets, 
                        sum(r.goals_conceded) AS total_goals_conceded
+            """)
+
+            # 3. best players by total points
+            queries.append("""
+                MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f)
+                MATCH (p)-[:PLAYS_AS]->(pos:Position)
+                WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                RETURN p.player_name AS player, 
+                       s.season_name AS season,
+                       sum(r.minutes) AS minutes,
+                       sum(r.goals_scored) AS goals, 
+                       sum(r.assists) AS assists, 
+                       sum(r.clean_sheets) AS clean_sheets,
+                       sum(r.total_points) AS total_points,
+                       sum(r.bonus) AS total_bonus
+                ORDER BY total_points DESC
+                LIMIT 5
+            """)
+
+            # 4. Overall Team Performance (Aggregated Stats)
+            queries.append("""
+                MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+                MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
+                MATCH (p:Player)-[r:PLAYED_IN]->(f)
+                WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                  AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+                
+                RETURN t.name AS team,
+                       s.season_name AS season,
+                       count(DISTINCT f) AS games_played,
+                       sum(r.goals_scored) AS total_goals,
+                       sum(r.assists) AS total_assists,
+                       sum(r.clean_sheets) AS total_clean_sheets,
+                       sum(r.total_points) AS total_points,
+                       avg(r.total_points) AS avg_points_per_game
             """)
 
         # -------------------------------------
