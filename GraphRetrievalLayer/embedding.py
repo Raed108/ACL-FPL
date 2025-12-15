@@ -118,6 +118,7 @@ def semantic_search(query: list, model_choice: str = "mpnet", limit: int = 5):
 def cypher_player_stats(name: str, season: str = None):
     """
     Returns multiple perspectives on player statistics
+    Updated with new queries using CONTAINS for flexible matching
     """
     results = {}
     
@@ -153,44 +154,42 @@ def cypher_player_stats(name: str, season: str = None):
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE p.player_name = $player_name
-              AND ($season IS NULL OR s.season_name = $season)
-            RETURN p.player_name AS player,
+            WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            RETURN p.player_name AS player, 
                    s.season_name AS season,
                    sum(r.minutes) AS minutes,
-                   sum(r.goals_scored) AS goals,
-                   sum(r.assists) AS assists,
+                   sum(r.goals_scored) AS goals, 
+                   sum(r.assists) AS assists, 
                    sum(r.clean_sheets) AS clean_sheets,
                    sum(r.total_points) AS total_points,
                    sum(r.bonus) AS total_bonus
         """, player_name=name, season=season)
         results['season_overview'] = result.single().data() if result.peek() else None
         
-        # 2. Recent Form - Last 5 Gameweeks
+        # 2. Recent Form (Last 5 Games Played)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE p.player_name = $player_name
-              AND ($season IS NULL OR s.season_name = $season)
+            WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
             WITH p, r, gw ORDER BY gw.GW_number DESC LIMIT 5
-            RETURN p.player_name AS player,
+            RETURN p.player_name AS player, 
                    collect(gw.GW_number) as recent_gameweeks,
                    collect(r.total_points) as recent_points,
                    avg(r.ict_index) as avg_ict_form
         """, player_name=name, season=season)
         results['recent_form'] = result.single().data() if result.peek() else None
         
-        # 3. Efficiency Stats (now also filtered by season for consistency)
+        # 3. Efficiency (Points per 90)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
-            MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE p.player_name = $player_name
-              AND ($season IS NULL OR s.season_name = $season)
+            WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
             WITH p, sum(r.total_points) as pts, sum(r.minutes) as mins
             WHERE mins > 0
-            RETURN p.player_name AS player,
+            RETURN p.player_name AS player, 
                    (toFloat(pts) / mins * 90) AS points_per_90
-        """, player_name=name, season=season)
+        """, player_name=name)
         results['efficiency'] = result.single().data() if result.peek() else None
     
     return results
@@ -199,40 +198,41 @@ def cypher_player_stats(name: str, season: str = None):
 def cypher_top_scorers(season: str = None, position: str = None):
     """
     Returns multiple top player rankings
+    Updated with new queries using CONTAINS for flexible matching
     """
     results = {}
     
     with driver.session() as session:
-        # 1. Top Total Points
+        # 1. Top Point Scorers
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (p)-[:PLAYS_AS]->(pos:Position)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE ($position IS NULL OR pos.name = $position)
-              AND ($season IS NULL OR s.season_name = $season)
+            WHERE ($position IS NULL OR toLower(pos.name) CONTAINS toLower($position))
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
             RETURN p.player_name AS player, pos.name AS position, sum(r.total_points) AS total_points
             ORDER BY total_points DESC
-            LIMIT 5
+            LIMIT 10
         """, position=position, season=season)
         results['top_points'] = [r.data() for r in result]
         
-        # 2. Top Goal Scorers
+        # 2. Golden Boot (Goals)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE ($season IS NULL OR s.season_name = $season)
-            RETURN p.player_name AS player, sum(r.goals_scored) AS goals, sum(r.minutes) as minutes
+            WHERE ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            RETURN p.player_name AS player, sum(r.goals_scored) AS goals
             ORDER BY goals DESC
             LIMIT 5
         """, season=season)
         results['top_scorers'] = [r.data() for r in result]
         
-        # 3. Top Playmakers
+        # 3. Top Playmakers (Assists)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE ($season IS NULL OR s.season_name = $season)
-            RETURN p.player_name AS player, sum(r.assists) AS assists, sum(r.ict_index) as total_ict
+            WHERE ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            RETURN p.player_name AS player, sum(r.assists) AS assists, sum(r.ict_index) as creativity_score
             ORDER BY assists DESC
             LIMIT 5
         """, season=season)
@@ -243,10 +243,10 @@ def cypher_top_scorers(season: str = None, position: str = None):
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (p)-[:PLAYS_AS]->(pos:Position)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
-            WHERE pos.name IN ['DEF']
-              AND ($season IS NULL OR s.season_name = $season)
-            RETURN p.player_name AS player,
-                   sum(r.clean_sheets) AS clean_sheets,
+            WHERE pos.name IN ['DEF', 'GK']
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            RETURN p.player_name AS player, 
+                   sum(r.clean_sheets) AS clean_sheets, 
                    sum(r.goals_conceded) as goals_conceded,
                    sum(r.total_points) as total_points
             ORDER BY clean_sheets DESC, total_points DESC
@@ -260,21 +260,21 @@ def cypher_top_scorers(season: str = None, position: str = None):
 def cypher_fixture_info(fixture_number: int = None, season: str = None, team: str = None, player_name: str = None):
     """
     Returns fixture information and upcoming schedule
+    Updated with new queries using CONTAINS for flexible matching
     """
     results = {}
     
     with driver.session() as session:
-        # 1. Upcoming Schedule
+        # 1. Upcoming Fixtures for Team
         result = session.run("""
-            MATCH (my_team:Team)
-            WHERE ($team IS NULL OR my_team.name = $team)
-            MATCH (my_team)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
-            WHERE f.kickoff_time >= datetime()
-            WITH f, my_team
+            MATCH (t:Team)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+            WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+              AND f.kickoff_time >= datetime() 
+            WITH f, t
             MATCH (f)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(opponent:Team)
-            WHERE opponent <> my_team
-            RETURN f.kickoff_time AS kickoff,
-                   my_team.name AS team,
+            WHERE opponent <> t
+            RETURN f.kickoff_time AS kickoff, 
+                   t.name AS team, 
                    opponent.name AS opponent
             ORDER BY f.kickoff_time ASC
             LIMIT 3
@@ -300,83 +300,99 @@ def cypher_fixture_info(fixture_number: int = None, season: str = None, team: st
 
 def cypher_team_analysis(team_name: str, season: str = None):
     """
-    FINAL – WORKS PERFECTLY with your schema (Dec 2025)
-    No syntax errors, no unbound variables, no deprecation warnings
+    Returns comprehensive team analysis
+    Updated with new queries using CONTAINS for flexible matching
     """
+    results = {}
+    
     if season:
         season = season.replace("/", "-").strip()
 
     with driver.session() as session:
-        # ==================== 1. TOP 10 ATTACKERS ====================
-        top_attackers = session.run("""
-            MATCH (t:Team {name: $team})<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+        # 1. Best Attackers (Goals/Assists in games involving this team)
+        result = session.run("""
+            MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
             MATCH (p:Player)-[r:PLAYED_IN]->(f)
-            MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season {season_name: $season})
-            
-            WITH p,
-                 sum(r.total_points) AS points,
-                 sum(r.goals_scored) AS goals,
-                 sum(r.assists) AS assists
-            WHERE points > 0
-            RETURN p.player_name AS player,
-                   goals,
-                   assists,
-                   points
+            MATCH (p)-[:PLAYS_AS]->(pos:Position)
+            WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+                AND pos.name IN ['FW', 'MID']
+            RETURN p.player_name AS player, 
+                   sum(r.goals_scored) AS goals, 
+                   sum(r.assists) AS assists, 
+                   sum(r.total_points) as points
             ORDER BY points DESC
-            LIMIT 10
-        """, team=team_name, season=season).data()
+            LIMIT 5
+        """, team=team_name)
+        results['top_attackers'] = [r.data() for r in result]
 
-        # ==================== 2. TEAM GOALS SCORED & CONCEDED ====================
-        # We cannot use (f)-[:...]->(t) inside WHERE after WITH f — Neo4j forbids it
-        # So we keep `t` in scope the whole time
-        stats = session.run("""
-            MATCH (t:Team {name: $team})<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
-            MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season {season_name: $season})
+        # 2. Team Defensive Overview (via Clean Sheets in team games)
+        result = session.run("""
+            MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+            MATCH (p:Player)-[r:PLAYED_IN]->(f)
+            MATCH (p)-[:PLAYS_AS]->(pos:Position)
+            WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+              AND pos.name IN ['DEF', 'GK']
+            RETURN t.name AS team, 
+                   sum(r.clean_sheets) AS total_clean_sheets, 
+                   sum(r.goals_conceded) AS total_goals_conceded
+        """, team=team_name)
+        results['defensive_overview'] = result.single().data() if result.peek() else None
 
-            // Our goals in this fixture
-            OPTIONAL MATCH (our:Player)-[r:PLAYED_IN]->(f)
-            WITH t, f, coalesce(sum(r.goals_scored), 0) AS our_goals
+        # 3. Best players by total points
+        result = session.run("""
+            MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+            MATCH (p:Player)-[r:PLAYED_IN]->(f)
+            MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
+            WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            RETURN p.player_name AS player, 
+                   s.season_name AS season,
+                   sum(r.minutes) AS minutes,
+                   sum(r.goals_scored) AS goals, 
+                   sum(r.assists) AS assists, 
+                   sum(r.clean_sheets) AS clean_sheets,
+                   sum(r.total_points) AS total_points,
+                   sum(r.bonus) AS total_bonus
+            ORDER BY total_points DESC
+            LIMIT 5
+        """, team=team_name, season=season)
+        results['best_players'] = [r.data() for r in result]
 
-            // Opponent goals in this fixture
-            OPTIONAL MATCH (opp:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f)  // get the other team
-            OPTIONAL MATCH (opp:Player)-[or:PLAYED_IN]->(f)
-            WHERE NOT (f)-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]->(t)
-            WITH f, our_goals, coalesce(sum(or.goals_scored), 0) AS opp_goals
-
-            RETURN 
-                count(DISTINCT f) AS played,
-                sum(our_goals) AS goals_scored,
-                sum(opp_goals) AS goals_conceded
-        """, team=team_name, season=season).single()
-
-        # Build clean result
-        overview = {
-            "team": team_name,
-            "season": season,
-            "played": stats["played"] if stats else 0,
-            "goals_scored": stats["goals_scored"] if stats else 0,
-            "goals_conceded": stats["goals_conceded"] if stats else 0,
-            "goal_difference": (stats["goals_scored"] - stats["goals_conceded"]) if stats else 0
-        }
-
-        return {
-            "top_attackers": top_attackers,
-            "team_overview": overview
-        }
+        # 4. Overall Team Performance (Aggregated Stats)
+        result = session.run("""
+            MATCH (t:Team)<-[:HAS_HOME_TEAM|HAS_AWAY_TEAM]-(f:Fixture)
+            MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
+            MATCH (p:Player)-[r:PLAYED_IN]->(f)
+            WHERE ($team IS NOT NULL AND toLower(t.name) CONTAINS toLower($team))
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
+            
+            RETURN t.name AS team,
+                   s.season_name AS season,
+                   count(DISTINCT f) AS games_played,
+                   sum(r.goals_scored) AS total_goals,
+                   sum(r.assists) AS total_assists,
+                   sum(r.clean_sheets) AS total_clean_sheets,
+                   sum(r.total_points) AS total_points,
+                   avg(r.total_points) AS avg_points_per_game
+        """, team=team_name, season=season)
+        results['team_overview'] = result.single().data() if result.peek() else None
+    
+    return results
 
 
-def cypher_recommend(season: str = None, position: str = None):
+def cypher_recommend(season: str = None, position: str = None, player_name: str = None, gameweek: str = None):
     """
     Returns player recommendations based on multiple criteria
+    Updated with new queries using CONTAINS for flexible matching
     """
     results = {}
     
     with driver.session() as session:
-        # 1. Best Value Picks
+        # 1. Value Picks (Points per 90min)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (p)-[:PLAYS_AS]->(pos:Position)
-            WHERE ($position IS NULL OR pos.name = $position)
+            WHERE ($position IS NULL OR toLower(pos.name) CONTAINS toLower($position))
             WITH p, pos, sum(r.total_points) as pts, sum(r.minutes) as mins
             WHERE mins > 500
             RETURN p.player_name AS player, 
@@ -388,25 +404,26 @@ def cypher_recommend(season: str = None, position: str = None):
         """, position=position)
         results['value_picks'] = [r.data() for r in result]
         
-        # 2. Captaincy Options
+        # 2. Form (Last 3 Games)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)
+            WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
             WITH p, r, gw ORDER BY gw.GW_number DESC
             WITH p, collect(r.total_points)[0..3] as recent_points
-            RETURN p.player_name AS player,
+            RETURN p.player_name AS player, 
                    reduce(s = 0, x IN recent_points | s + x) as form_score
             ORDER BY form_score DESC
             LIMIT 5
-        """)
+        """, player_name=player_name)
         results['captaincy_options'] = [r.data() for r in result]
         
-        # 3. High Points Players (original recommendation logic)
+        # 3. High Points Players (for backwards compatibility)
         result = session.run("""
             MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
             MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)<-[:HAS_GW]-(s:Season)
             WHERE r.total_points > 100
-              AND ($season IS NULL OR s.season_name = $season)
+              AND ($season IS NULL OR toLower(s.season_name) CONTAINS toLower($season))
             RETURN p.player_name AS name,
                    sum(r.total_points) AS total_points,
                    s.season_name AS season

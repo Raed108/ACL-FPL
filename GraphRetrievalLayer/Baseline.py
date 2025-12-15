@@ -244,6 +244,8 @@ class GraphRetrieval:
             queries.append("""
                 MATCH (p:Player)-[r:PLAYED_IN]->(f:Fixture)
                 MATCH (f)<-[:HAS_FIXTURE]-(gw:Gameweek)
+                WHERE ($player_name IS NULL OR toLower(p.player_name) CONTAINS toLower($player_name))
+                  AND ($gameweek IS NULL OR toLower(gw.GW_number) CONTAINS toLower($gameweek))
                 WITH p, r, gw ORDER BY gw.GW_number DESC
                 WITH p, collect(r.total_points)[0..3] as recent_points
                 RETURN p.player_name AS player, 
