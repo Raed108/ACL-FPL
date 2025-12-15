@@ -741,11 +741,25 @@ if "quick_question" not in st.session_state:
     st.session_state.quick_question = None
 
 quick_questions = [
-    "Top performing players this week",
-    "Upcoming fixture analysis",
-    "Best captain recommendation",
-    "Team formation suggestions",
-    "Injury updates"
+    "Who was the highest-scoring Fantasy Premier League player in the 2021/22 season?",
+
+    "Which defender became a must-have FPL asset in 2021/22 after scoring double-digit goals for Liverpool?",
+
+    "In the 2022/23 season, which Manchester City striker broke the record for most goals in a single Premier League season and dominated FPL scoring?",
+
+    "Which FPL chip allows managers to earn double points from all 15 players, and how many times can it be used per season?",
+
+    "Which Arsenal midfielder emerged as a budget-friendly FPL favorite during the 2022/23 title challenge?",
+
+    "Who finished the 2022/23 season as the highest-scoring FPL goalkeeper?",
+
+    "Which Brighton midfielder became a popular differential pick in 2022/23 due to his consistent attacking returns?",
+
+    "What was the maximum number of points a single FPL captain could score in one gameweek between 2021 and 2023?",
+
+    "Which club provided the most FPL points overall in the 2021/22 season?",
+
+    "What price did Erling Haaland start at in Fantasy Premier League at the beginning of the 2022/23 season?"
 ]
 
 st.markdown('<div class="fixed-question-icon">', unsafe_allow_html=True)
@@ -825,23 +839,46 @@ if prompt:
                     or "No specific data found in the Knowledge Graph."
                 )
 
+                # LLM Response
                 model_id = MODELS.get(model_choice)
+
                 prompt_str = create_prompt_template(combined_context, prompt)
-
-                full_response = query_llm(
-                    model_id, prompt_str, OPENROUTER_API_KEY
-                ).get("answer")
-
+                full_response = query_llm(model_id, prompt_str, OPENROUTER_API_KEY).get("answer")
                 message_placeholder.markdown(full_response)
 
-            except Exception as e:
-                full_response = (
-                    "⚠️ An error occurred during analysis. "
-                    "Please retry your request."
-                )
-                st.error(f"⚠️ SYSTEM ERROR: {e}")
+                # --- Transparency UI ---
+                with st.expander("🔬 DETAILED ANALYTICS BREAKDOWN"):
+                    tab1, tab2, tab3, tab4 = st.tabs(["🎯 INTENT & ENTITIES", "📊 CONTEXT DATA", "⚙️ QUERY LOG", "🕸️ KNOWLEDGE GRAPH"])
+                    
+                    with tab1:
+                        st.markdown("<h3>DETECTED INTENT</h3>", unsafe_allow_html=True)
+                        st.code(intent, language="text")
+                        st.markdown("<h3 style='margin-top: 1.5rem;'>EXTRACTED ENTITIES</h3>", unsafe_allow_html=True)
+                        st.json(entities)
+                    
+                    with tab2:
+                        st.markdown("<h3>LLM CONTEXT INPUT</h3>", unsafe_allow_html=True)
+                        st.text_area("", context_str, height=300, disabled=True, label_visibility="collapsed")
 
-    # Save assistant message
-    st.session_state.messages.append(
-        {"role": "assistant", "content": full_response}
-    )
+                    with tab3:
+                        st.markdown("<h3>EXECUTED CYPHER QUERIES</h3>", unsafe_allow_html=True)
+                        if baseline_results:
+                            for query_key in baseline_results.keys():
+                                st.code(f"MATCH (n)-[r]->(m) WHERE ... RETURN ...  // Query: {query_key}", language="cypher")
+                        else:
+                            st.info("⚠️ No Cypher queries executed for this request.")
+                    
+                    with tab4:
+                        st.markdown("<h3>GRAPH VISUALIZATION</h3>", unsafe_allow_html=True)
+                        if baseline_results:
+                            visualize_graph(baseline_results)
+                        # elif vector_results:
+                        #     visualize_graph(vector_results)
+                        else:
+                            st.info("⚠️ No graph data available for visualization.")
+
+            except Exception as e:
+                st.error(f"⚠️ SYSTEM ERROR: {e}")
+                full_response = "⚠️ An error occurred during analysis. Please retry your request."
+
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
