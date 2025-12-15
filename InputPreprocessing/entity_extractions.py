@@ -1,3 +1,4 @@
+from urllib import response
 from google import genai
 from google.genai import types
 import os 
@@ -15,7 +16,6 @@ driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
 
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -59,9 +59,12 @@ def extract_entities_with_llm(user_query: str):
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=prompt
+        contents=prompt,
+        config={
+        "response_mime_type": "application/json",
+        "response_json_schema": Entity.model_json_schema(),
+     },
     )
-
 
     json_text = json.loads(response.text)
     return json_text
