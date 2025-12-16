@@ -32,7 +32,7 @@ class Entity(BaseModel):
     )
     season: List[str] = Field(
         default_factory=list,
-        description="List of football seasons referenced in the query and should be full season format like \"2022-23\" e.g if user enters(2022 or 22), and we have only 2 seasons 2021-22 and 2022-23, if else return embt list"
+        description="List of football seasons referenced in the query and should be full season format like \"2022-23\" e.g if user enters(2022 or 22), and we have only 2 seasons 2021-22 and 2022-23, if else return empty list"
     )
     gameweek: List[str] = Field(
         default_factory=list,
@@ -75,18 +75,17 @@ def extract_entities_with_llm(user_query: str):
 
 nlp = spacy.load("en_core_web_sm")
 
-POSITION_MAP = {
-    "forward": "FWD", "forwards": "FWD", "striker": "FWD", "strikers": "FWD", "fwd": "FWD", "fwds": "FWD", "attacker": "FWD", "attackers": "FWD",
-    "midfielder": "MID", "midfielders": "MID", "mid": "MID", "mids": "MID", "winger": "MID", "wingers": "MID", "cm": "MID", "cmf": "MID", "cam": "MID", "cdm": "MID",
-    "defender": "DEF", "defenders": "DEF", "def": "DEF", "defs": "DEF", "fullback": "DEF", "fullbacks": "DEF", "cb": "DEF", "cbf": "DEF", "lb": "DEF", "rb": "DEF",
-    "goalkeeper": "GK", "keeper": "GK", "goalkeepers": "GK", "gk": "GK"
-}
+
+
+
+
 
 
 with driver.session() as session:
     result = session.run("MATCH (t:Team) WITH DISTINCT t RETURN t.name AS name")
     teams = sorted([row["name"].lower().strip() for row in result], key=len, reverse=True)
 
+    # print(teams)
 
 
     result = session.run("MATCH (s:Season) RETURN s.season_name AS season")
@@ -123,6 +122,13 @@ def extract_gameweek(text):
 
 
 def extract_position(text):
+    POSITION_MAP = {
+        "forward": "FWD", "forwards": "FWD", "striker": "FWD", "strikers": "FWD", "fwd": "FWD", "fwds": "FWD", "attacker": "FWD", "attackers": "FWD",
+        "midfielder": "MID", "midfielders": "MID", "mid": "MID", "mids": "MID", "winger": "MID", "wingers": "MID", "cm": "MID", "cmf": "MID", "cam": "MID", "cdm": "MID",
+        "defender": "DEF", "defenders": "DEF", "def": "DEF", "defs": "DEF", "fullback": "DEF", "fullbacks": "DEF", "cb": "DEF", "cbf": "DEF", "lb": "DEF", "rb": "DEF",
+        "goalkeeper": "GK", "keeper": "GK", "goalkeepers": "GK", "gk": "GK"
+    }
+
     found = []
     for word, pos in POSITION_MAP.items():
         if word in text.lower():
@@ -131,11 +137,117 @@ def extract_position(text):
     return found
 
 def extract_team(text):
+    TEAM_SYNONYMS = {
+        "crystal palace": [
+            "palace", "crystal", "crystal palace fc", "cpfc"
+        ],
+
+        "nott'm forest": [
+            "nottingham forest", "forest", "notts forest", "nottm forest", "nottingham"
+        ],
+
+        "aston villa": [
+            "villa", "aston villa fc", "avfc"
+        ],
+
+        "southampton": [
+            "saints", "southampton fc", "soton"
+        ],
+
+        "bournemouth": [
+            "afc bournemouth", "bournemouth fc", "cherries"
+        ],
+
+        "brentford": [
+            "brentford fc", "the bees"
+        ],
+
+        "liverpool": [
+            "liverpool fc", "lfc", "the reds"
+        ],
+
+        "leicester": [
+            "leicester city", "leicester city fc", "lcfc", "foxes", "leicester fc"
+        ],
+
+        "newcastle": [
+            "newcastle united", "newcastle utd", "newcastle united fc", "nufc", "magpies"
+        ],
+
+        "brighton": [
+            "brighton & hove albion", "brighton and hove albion", "bha", "bhafc", "brighton fc", "seagulls"
+        ],
+
+        "west ham": [
+            "west ham united", "west ham utd", "west ham united fc", "whu", "whufc", "hammers"
+        ],
+
+        "man city": [
+            "manchester city", "man city fc", "manchester city fc", "mancity", "mcfc", "city"
+        ],
+
+        "burnley": [
+            "burnley fc", "clarets"
+        ],
+
+        "norwich": [
+            "norwich city", "norwich city fc", "ncfc", "canaries"
+        ],
+
+        "chelsea": [
+            "chelsea fc", "cfc", "the blues"
+        ],
+
+        "everton": [
+            "everton fc", "efc", "toffees"
+        ],
+
+        "watford": [
+            "watford fc", "hornets"
+        ],
+
+        "man utd": [
+            "manchester united", "man united", "man utd fc", "manchester utd", "manchester united fc",
+            "mufc", "red devils"
+        ],
+
+        "arsenal": [
+            "arsenal fc", "afc", "gunners"
+        ],
+
+        "wolves": [
+            "wolverhampton wanderers", "wolverhampton", "wolves fc", "wwfc"
+        ],
+
+        "fulham": [
+            "fulham fc", "ffc", "cottagers"
+        ],
+
+        "spurs": [
+            "tottenham", "tottenham hotspur", "tottenham hotspur fc", "thfc"
+        ],
+
+        "leeds": [
+            "leeds united", "leeds utd", "leeds united fc", "lufc"
+        ]
+    }
+
+    text_l = text.lower()
     found = []
-    for t in teams:
-        if t in text.lower() and t not in found:
+
+    # direct match
+    for t in TEAM_SYNONYMS:
+        if t in text_l and t not in found:
             found.append(t)
+
+    # synonyms match
+    for canonical, aliases in TEAM_SYNONYMS.items():
+        for alias in aliases:
+            if alias in text_l and canonical not in found:
+                found.append(canonical)
+
     return found
+
 
 def extract_season(text):
     found = []

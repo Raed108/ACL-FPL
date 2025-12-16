@@ -1,6 +1,5 @@
 from sentence_transformers import SentenceTransformer
 
-# Two embedding models (Requirement 1)
 MODEL_MINILM = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL_MPNET = "sentence-transformers/all-mpnet-base-v2"
 
